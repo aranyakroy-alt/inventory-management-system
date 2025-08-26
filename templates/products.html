@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="products-container">
+    <div class="products-header">
+        <h2>All Products</h2>
+        <div class="products-summary">
+            <span class="product-count">📦 Total Products: {{ products|length }}</span>
+            <a href="{{ url_for('add_product') }}" class="btn btn-primary">➕ Add New Product</a>
+        </div>
+    </div>
+
+    {% if products %}
+        <div class="table-container">
+            <table class="products-table">
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>SKU</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        <th>Stock Status</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td class="product-name">{{ product.name }}</td>
+                        <td class="sku">{{ product.sku }}</td>
+                        <td class="price">${{ "%.2f"|format(product.price) }}</td>
+                        <td class="quantity">{{ product.quantity }}</td>
+                        <td class="stock-status">
+                            {% if product.quantity == 0 %}
+                                <span class="status out-of-stock">Out of Stock</span>
+                            {% elif product.quantity < 10 %}
+                                <span class="status low-stock">Low Stock</span>
+                            {% else %}
+                                <span class="status in-stock">In Stock</span>
+                            {% endif %}
+                        </td>
+                        <td class="description">{{ product.description or 'No description' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No Products Yet</h3>
+            <p>You haven't added any products to your inventory yet.</p>
+            <a href="{{ url_for('add_product') }}" class="btn btn-primary">Add Your First Product</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
