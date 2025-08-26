@@ -79,7 +79,17 @@
                         <td class="product-name">{{ product.name }}</td>
                         <td class="sku">{{ product.sku }}</td>
                         <td class="price">${{ "%.2f"|format(product.price) }}</td>
-                        <td class="quantity">{{ product.quantity }}</td>
+                        <td class="quantity-cell">
+                            <div class="quantity-display">
+                                <span class="quantity-number">{{ product.quantity }}</span>
+                                <div class="stock-controls">
+                                    <button class="btn btn-stock btn-decrease" onclick="adjustStock({{ product.id }}, 'decrease', '{{ product.name }}')" 
+                                            title="Decrease by 1" {% if product.quantity == 0 %}disabled{% endif %}>−</button>
+                                    <button class="btn btn-stock btn-increase" onclick="adjustStock({{ product.id }}, 'increase', '{{ product.name }}')" 
+                                            title="Increase by 1">+</button>
+                                </div>
+                            </div>
+                        </td>
                         <td class="stock-status">
                             {% if product.quantity == 0 %}
                                 <span class="status out-of-stock">Out of Stock</span>
@@ -145,6 +155,48 @@
 function deleteProduct(id, name) {
     if (confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
         window.location.href = `/delete_product/${id}`;
+    }
+}
+
+function adjustStock(id, action, name) {
+    const actionText = action === 'increase' ? 'add 1 to' : 'remove 1 from';
+    if (confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} "${name}" stock?`)) {
+        window.location.href = `/adjust_stock/${id}/${action}`;
+    }
+}
+
+function bulkAdjustStock(id, name, currentQuantity) {
+    const adjustment = prompt(`Current stock for "${name}": ${currentQuantity}\n\nEnter adjustment amount:\n(Positive to add, negative to remove)`);
+    
+    if (adjustment === null) return; // User cancelled
+    
+    const adjustmentNum = parseInt(adjustment);
+    if (isNaN(adjustmentNum) || adjustmentNum === 0) {
+        alert('Please enter a valid non-zero number');
+        return;
+    }
+    
+    const newQuantity = currentQuantity + adjustmentNum;
+    if (newQuantity < 0) {
+        alert(`Cannot adjust stock to ${newQuantity} (would be negative)`);
+        return;
+    }
+    
+    const actionText = adjustmentNum > 0 ? `add ${adjustmentNum}` : `remove ${Math.abs(adjustmentNum)}`;
+    if (confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} from "${name}" stock?\nNew quantity will be: ${newQuantity}`)) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/bulk_adjust_stock/${id}`;
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'adjustment';
+        input.value = adjustmentNum;
+        
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 </script>

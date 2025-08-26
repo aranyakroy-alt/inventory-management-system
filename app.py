@@ -146,6 +146,85 @@ def delete_product(id):
     
     return redirect(url_for('products'))
 
+@app.route('/adjust_stock/<int:id>/<action>')
+def adjust_stock(id, action):
+    """Adjust product stock quantity"""
+    try:
+        # Find the product or return 404 if not found
+        product = Product.query.get_or_404(id)
+        
+        # Store current values for messages
+        product_name = product.name
+        old_quantity = product.quantity
+        
+        # Perform stock adjustment
+        if action == 'increase':
+            product.quantity += 1
+            new_quantity = product.quantity
+            flash(f'✅ Added 1 to "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+            
+        elif action == 'decrease':
+            if product.quantity > 0:
+                product.quantity -= 1
+                new_quantity = product.quantity
+                flash(f'➖ Removed 1 from "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+            else:
+                flash(f'❌ Cannot decrease "{product_name}" stock - already at 0', 'error')
+                return redirect(url_for('products'))
+        else:
+            flash('❌ Invalid stock adjustment action', 'error')
+            return redirect(url_for('products'))
+        
+        # Save changes to database
+        db.session.commit()
+        
+    except Exception as e:
+        flash(f'❌ Error adjusting stock: {str(e)}', 'error')
+    
+    return redirect(url_for('products'))
+
+@app.route('/bulk_adjust_stock/<int:id>', methods=['POST'])
+def bulk_adjust_stock(id):
+    """Adjust product stock by custom amount"""
+    try:
+        # Find the product or return 404 if not found
+        product = Product.query.get_or_404(id)
+        
+        # Get adjustment amount from form
+        adjustment = int(request.form.get('adjustment', 0))
+        
+        if adjustment == 0:
+            flash('❌ Please enter a valid adjustment amount', 'error')
+            return redirect(url_for('products'))
+        
+        # Store current values for messages
+        product_name = product.name
+        old_quantity = product.quantity
+        new_quantity = old_quantity + adjustment
+        
+        # Validate new quantity isn't negative
+        if new_quantity < 0:
+            flash(f'❌ Cannot adjust "{product_name}" stock to {new_quantity} (would be negative)', 'error')
+            return redirect(url_for('products'))
+        
+        # Apply adjustment
+        product.quantity = new_quantity
+        
+        # Create appropriate message
+        if adjustment > 0:
+            flash(f'✅ Added {adjustment} to "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+        else:
+            flash(f'➖ Removed {abs(adjustment)} from "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+        
+        # Save changes to database
+        db.session.commit()
+        
+    except ValueError:
+        flash('❌ Please enter a valid number for stock adjustment', 'error')
+    except Exception as e:
+        flash(f'❌ Error adjusting stock: {str(e)}', 'error')
+    
+    return redirect(url_for('products'))
 
 # Run the application
 if __name__ == '__main__':
