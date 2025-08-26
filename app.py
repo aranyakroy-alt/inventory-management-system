@@ -101,7 +101,26 @@ def edit_product(id):
     
     # GET request - show the edit form with current data
     return render_template('edit_product.html', product=product)
+
+@app.route('/delete_product/<int:id>')
+def delete_product(id):
+    """Delete a product"""
+    try:
+        # Find the product or return 404 if not found
+        product = Product.query.get_or_404(id)
+        product_name = product.name  # Store name before deletion for message
+        
+        # Delete from database
+        db.session.delete(product)
+        db.session.commit()
+        
+        flash(f'Product "{product_name}" deleted successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error deleting product: {str(e)}', 'error')
     
+    return redirect(url_for('products'))
+
 # Run the application
 if __name__ == '__main__':
     with app.app_context():
