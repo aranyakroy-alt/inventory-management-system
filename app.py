@@ -21,8 +21,20 @@ def index():
 
 @app.route('/products')
 def products():
-    """Display all products"""
-    all_products = Product.query.all()
+    """Display all products with optional search"""
+    search_query = request.args.get('search', '').strip()
+    
+    if search_query:
+        # Search across name, SKU, and description
+        all_products = Product.query.filter(
+            Product.name.contains(search_query) |
+            Product.sku.contains(search_query) |
+            Product.description.contains(search_query)
+        ).all()
+    else:
+        # Show all products
+        all_products = Product.query.all()
+    
     return render_template('products.html', products=all_products)
 
 @app.route('/add_product', methods=['GET', 'POST'])
@@ -120,6 +132,7 @@ def delete_product(id):
         flash(f'Error deleting product: {str(e)}', 'error')
     
     return redirect(url_for('products'))
+
 
 # Run the application
 if __name__ == '__main__':

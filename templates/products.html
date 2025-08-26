@@ -4,9 +4,26 @@
 <div class="products-container">
     <div class="products-header">
         <h2>All Products</h2>
-        <div class="products-summary">
-            <span class="product-count">📦 Total Products: {{ products|length }}</span>
-            <a href="{{ url_for('add_product') }}" class="btn btn-primary">➕ Add New Product</a>
+        <div class="products-controls">
+            <form method="GET" class="search-form">
+                <div class="search-group">
+                    <input type="text" name="search" placeholder="🔍 Search by name, SKU, or description..." 
+                           value="{{ request.args.get('search', '') }}" class="search-input">
+                    <button type="submit" class="btn btn-search">Search</button>
+                    {% if request.args.get('search') %}
+                        <a href="{{ url_for('products') }}" class="btn btn-clear">Clear</a>
+                    {% endif %}
+                </div>
+            </form>
+            <div class="products-summary">
+                {% if request.args.get('search') %}
+                    <span class="product-count">🔍 Found: {{ products|length }} products</span>
+                    <span class="search-term">Search: "{{ request.args.get('search') }}"</span>
+                {% else %}
+                    <span class="product-count">📦 Total Products: {{ products|length }}</span>
+                {% endif %}
+                <a href="{{ url_for('add_product') }}" class="btn btn-primary">➕ Add New Product</a>
+            </div>
         </div>
     </div>
 
@@ -53,18 +70,29 @@
             </table>
         </div>
     {% else %}
-        <div class="empty-state">
-            <h3>No Products Yet</h3>
-            <p>You haven't added any products to your inventory yet.</p>
-            <a href="{{ url_for('add_product') }}" class="btn btn-primary">Add Your First Product</a>
-        </div>
+        {% if request.args.get('search') %}
+            <!-- No search results -->
+            <div class="no-results">
+                <h3>No Products Found</h3>
+                <p>No products match your search for "{{ request.args.get('search') }}"</p>
+                <a href="{{ url_for('products') }}" class="btn btn-secondary">Show All Products</a>
+            </div>
+        {% else %}
+            <!-- No products at all -->
+            <div class="empty-state">
+                <h3>No Products Yet</h3>
+                <p>You haven't added any products to your inventory yet.</p>
+                <a href="{{ url_for('add_product') }}" class="btn btn-primary">Add Your First Product</a>
+            </div>
+        {% endif %}
     {% endif %}
 </div>
+
 <script>
-    function deleteProduct(id, name) {
-        if (confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-            window.location.href = `/delete_product/${id}`;
-        }
+function deleteProduct(id, name) {
+    if (confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+        window.location.href = `/delete_product/${id}`;
     }
+}
 </script>
 {% endblock %}
