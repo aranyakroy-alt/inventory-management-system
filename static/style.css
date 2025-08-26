@@ -520,3 +520,150 @@ body {
         gap: 1.5rem;
     }
 }
+
+/* Filter section styles */
+.filter-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-label {
+    font-weight: 500;
+    color: #2c3e50;
+    white-space: nowrap;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-filter {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s;
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+    border: 2px solid transparent;
+}
+
+.btn-filter:hover {
+    background-color: #d5dbdb;
+    color: #2c3e50;
+}
+
+.btn-filter.active {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+.btn-filter.active:hover {
+    background-color: #2980b9;
+}
+
+/* Filter responsive design */
+@media (max-width: 768px) {
+    .filter-section {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .filter-buttons {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .btn-filter {
+        flex: 1;
+        text-align: center;
+        min-width: 0;
+    }
+}
+
+/* Filter section styles */
+.filter-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-label {
+    font-weight: 500;
+    color: #2c3e50;
+    white-space: nowrap;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-filter {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s;
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+    border: 2px solid transparent;
+}
+
+.btn-filter:hover {
+    background-color: #d5dbdb;
+    color: #2c3e50;
+}
+
+.btn-filter.active {
+    background-color: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+.btn-filter.active:hover {
+    background-color: #2980b9;
+}
+
+/* No results actions */
+.no-results-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Filter responsive design */
+@media (max-width: 768px) {
+    .filter-section {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .filter-buttons {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .btn-filter {
+        flex: 1;
+        text-align: center;
+        min-width: 0;
+    }
+    
+    .no-results-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+}

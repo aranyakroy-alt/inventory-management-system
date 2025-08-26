@@ -15,12 +15,44 @@
                     {% endif %}
                 </div>
             </form>
+            
+            <div class="filter-section">
+                <span class="filter-label">Filter by Stock Status:</span>
+                <div class="filter-buttons">
+                    <a href="{{ url_for('products', search=request.args.get('search', ''), filter='all') }}" 
+                       class="btn btn-filter {% if not request.args.get('filter') or request.args.get('filter') == 'all' %}active{% endif %}">
+                        📦 All Products
+                    </a>
+                    <a href="{{ url_for('products', search=request.args.get('search', ''), filter='in_stock') }}" 
+                       class="btn btn-filter {% if request.args.get('filter') == 'in_stock' %}active{% endif %}">
+                        ✅ In Stock
+                    </a>
+                    <a href="{{ url_for('products', search=request.args.get('search', ''), filter='low_stock') }}" 
+                       class="btn btn-filter {% if request.args.get('filter') == 'low_stock' %}active{% endif %}">
+                        ⚠️ Low Stock
+                    </a>
+                    <a href="{{ url_for('products', search=request.args.get('search', ''), filter='out_of_stock') }}" 
+                       class="btn btn-filter {% if request.args.get('filter') == 'out_of_stock' %}active{% endif %}">
+                        ❌ Out of Stock
+                    </a>
+                </div>
+            </div>
+            
             <div class="products-summary">
+                {% set filter_text = '' %}
+                {% if request.args.get('filter') == 'in_stock' %}
+                    {% set filter_text = ' (In Stock)' %}
+                {% elif request.args.get('filter') == 'low_stock' %}
+                    {% set filter_text = ' (Low Stock)' %}
+                {% elif request.args.get('filter') == 'out_of_stock' %}
+                    {% set filter_text = ' (Out of Stock)' %}
+                {% endif %}
+                
                 {% if request.args.get('search') %}
-                    <span class="product-count">🔍 Found: {{ products|length }} products</span>
+                    <span class="product-count">🔍 Found: {{ products|length }} products{{ filter_text }}</span>
                     <span class="search-term">Search: "{{ request.args.get('search') }}"</span>
                 {% else %}
-                    <span class="product-count">📦 Total Products: {{ products|length }}</span>
+                    <span class="product-count">📦 {{ products|length }} products{{ filter_text }}</span>
                 {% endif %}
                 <a href="{{ url_for('add_product') }}" class="btn btn-primary">➕ Add New Product</a>
             </div>
@@ -70,12 +102,33 @@
             </table>
         </div>
     {% else %}
-        {% if request.args.get('search') %}
-            <!-- No search results -->
+        {% if request.args.get('search') or request.args.get('filter') %}
+            <!-- No results for search/filter combination -->
             <div class="no-results">
-                <h3>No Products Found</h3>
-                <p>No products match your search for "{{ request.args.get('search') }}"</p>
-                <a href="{{ url_for('products') }}" class="btn btn-secondary">Show All Products</a>
+                {% if request.args.get('search') and request.args.get('filter') and request.args.get('filter') != 'all' %}
+                    <h3>No Products Found</h3>
+                    <p>No products match your search for "{{ request.args.get('search') }}" in the 
+                    {% if request.args.get('filter') == 'in_stock' %}In Stock{% endif %}
+                    {% if request.args.get('filter') == 'low_stock' %}Low Stock{% endif %}
+                    {% if request.args.get('filter') == 'out_of_stock' %}Out of Stock{% endif %}
+                    category.</p>
+                {% elif request.args.get('search') %}
+                    <h3>No Products Found</h3>
+                    <p>No products match your search for "{{ request.args.get('search') }}"</p>
+                {% elif request.args.get('filter') == 'in_stock' %}
+                    <h3>No Products In Stock</h3>
+                    <p>You don't have any products with stock quantity of 10 or more.</p>
+                {% elif request.args.get('filter') == 'low_stock' %}
+                    <h3>No Low Stock Products</h3>
+                    <p>Great! You don't have any products running low on stock (1-9 items).</p>
+                {% elif request.args.get('filter') == 'out_of_stock' %}
+                    <h3>No Out of Stock Products</h3>
+                    <p>Excellent! All your products are currently in stock.</p>
+                {% endif %}
+                <div class="no-results-actions">
+                    <a href="{{ url_for('products') }}" class="btn btn-secondary">Show All Products</a>
+                    <a href="{{ url_for('add_product') }}" class="btn btn-primary">Add New Product</a>
+                </div>
             </div>
         {% else %}
             <!-- No products at all -->

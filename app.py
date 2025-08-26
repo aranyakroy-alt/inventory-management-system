@@ -21,19 +21,32 @@ def index():
 
 @app.route('/products')
 def products():
-    """Display all products with optional search"""
+    """Display all products with optional search and filter"""
     search_query = request.args.get('search', '').strip()
+    filter_type = request.args.get('filter', 'all')
     
+    # Start with base query
+    query = Product.query
+    
+    # Apply search filter if provided
     if search_query:
-        # Search across name, SKU, and description
-        all_products = Product.query.filter(
+        query = query.filter(
             Product.name.contains(search_query) |
             Product.sku.contains(search_query) |
             Product.description.contains(search_query)
-        ).all()
-    else:
-        # Show all products
-        all_products = Product.query.all()
+        )
+    
+    # Apply stock status filter
+    if filter_type == 'in_stock':
+        query = query.filter(Product.quantity >= 10)
+    elif filter_type == 'low_stock':
+        query = query.filter(Product.quantity > 0, Product.quantity < 10)
+    elif filter_type == 'out_of_stock':
+        query = query.filter(Product.quantity == 0)
+    # 'all' or any other value shows all products (no additional filter)
+    
+    # Execute query
+    all_products = query.all()
     
     return render_template('products.html', products=all_products)
 
