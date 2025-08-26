@@ -60,6 +60,48 @@ def add_product():
     
     return render_template('add_product.html')
 
+@app.route('/edit_product/<int:id>', methods=['GET', 'POST'])
+def edit_product(id):
+    """Edit an existing product"""
+    # Find the product or return 404 if not found
+    product = Product.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            name = request.form['name']
+            sku = request.form['sku']
+            description = request.form['description']
+            price = float(request.form['price'])
+            quantity = int(request.form['quantity'])
+            
+            # Check if SKU is unique (excluding current product)
+            existing_product = Product.query.filter(Product.sku == sku, Product.id != id).first()
+            if existing_product:
+                flash(f'SKU "{sku}" is already in use by another product.', 'error')
+                return render_template('edit_product.html', product=product)
+            
+            # Update the product
+            product.name = name
+            product.sku = sku
+            product.description = description
+            product.price = price
+            product.quantity = quantity
+            
+            # Save to database
+            db.session.commit()
+            
+            flash(f'Product "{name}" updated successfully!', 'success')
+            return redirect(url_for('products'))
+            
+        except ValueError:
+            flash('Please enter valid numbers for price and quantity.', 'error')
+        except Exception as e:
+            flash(f'Error updating product: {str(e)}', 'error')
+    
+    # GET request - show the edit form with current data
+    return render_template('edit_product.html', product=product)
+    
 # Run the application
 if __name__ == '__main__':
     with app.app_context():

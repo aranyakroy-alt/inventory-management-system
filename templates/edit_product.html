@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="form-container">
+    <h2>Edit Product</h2>
+    <p>Update the information for "{{ product.name }}" (SKU: {{ product.sku }})</p>
+
+    <form method="POST" class="product-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Product Name *</label>
+                <input type="text" id="name" name="name" required placeholder="e.g., Wireless Headphones" value="{{ product.name }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="sku">SKU (Stock Keeping Unit) *</label>
+                <input type="text" id="sku" name="sku" required placeholder="e.g., WH-001" value="{{ product.sku }}">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" placeholder="Optional product description...">{{ product.description or '' }}</textarea>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="price">Price ($) *</label>
+                <input type="number" id="price" name="price" step="0.01" min="0" required placeholder="0.00" value="{{ product.price }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="quantity">Current Quantity *</label>
+                <input type="number" id="quantity" name="quantity" min="0" required placeholder="0" value="{{ product.quantity }}">
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">💾 Update Product</button>
+            <a href="{{ url_for('products') }}" class="btn btn-secondary">❌ Cancel</a>
+        </div>
+    </form>
+    
+    <div class="product-info">
+        <small class="text-muted">Product created: {{ product.created_at.strftime('%B %d, %Y at %I:%M %p') }}</small>
+    </div>
+</div>
+{% endblock %}
