@@ -69,6 +69,7 @@
                         <th>Price</th>
                         <th>Quantity</th>
                         <th>Stock Status</th>
+                        <th>Supplier</th>
                         <th>Description</th>
                         <th>Actions</th>
                     </tr>
@@ -97,6 +98,16 @@
                                 <span class="status low-stock">Low Stock</span>
                             {% else %}
                                 <span class="status in-stock">In Stock</span>
+                            {% endif %}
+                        </td>
+                        <td class="supplier">  <!-- Add this section -->
+                            {% if product.supplier %}
+                                <strong>{{ product.supplier.name }}</strong>
+                                {% if product.supplier.contact_person %}
+                                    <br><small>{{ product.supplier.contact_person }}</small>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">No supplier</span>
                             {% endif %}
                         </td>
                         <td class="description">{{ product.description or 'No description' }}</td>

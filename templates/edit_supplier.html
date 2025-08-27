@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="form-container">
+    <h2>Edit Supplier</h2>
+    <p>Update information for "{{ supplier.name }}"</p>
+
+    <form method="POST" class="product-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Company Name *</label>
+                <input type="text" id="name" name="name" required 
+                       value="{{ supplier.name }}"
+                       placeholder="e.g., ABC Electronics Inc.">
+            </div>
+            
+            <div class="form-group">
+                <label for="contact_person">Contact Person</label>
+                <input type="text" id="contact_person" name="contact_person" 
+                       value="{{ supplier.contact_person or '' }}"
+                       placeholder="e.g., John Smith">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" 
+                       value="{{ supplier.email or '' }}"
+                       placeholder="e.g., john@abcelectronics.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" name="phone" 
+                       value="{{ supplier.phone or '' }}"
+                       placeholder="e.g., (555) 123-4567">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="address">Address</label>
+            <textarea id="address" name="address" 
+                      placeholder="Optional full address (street, city, state, zip)">{{ supplier.address or '' }}</textarea>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">💾 Update Supplier</button>
+            <a href="{{ url_for('suppliers') }}" class="btn btn-secondary">❌ Cancel</a>
+        </div>
+    </form>
+    
+    <div class="product-info">
+        <small class="text-muted">
+            Supplier created: {{ supplier.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+        </small>
+        {% if supplier.products|length > 0 %}
+            <br>
+            <small class="text-muted">
+                Currently supplies {{ supplier.products|length }} products
+            </small>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

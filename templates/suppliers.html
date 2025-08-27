@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="products-container">
+    <div class="products-header">
+        <h2>All Suppliers</h2>
+        <div class="products-summary">
+            <span class="product-count">🏢 {{ suppliers|length }} suppliers</span>
+            <a href="{{ url_for('add_supplier') }}" class="btn btn-primary">➕ Add New Supplier</a>
+        </div>
+    </div>
+
+    {% if suppliers %}
+        <div class="table-container">
+            <table class="products-table">
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        <th>Contact Person</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Products</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for supplier in suppliers %}
+                    <tr>
+                        <td class="product-name">{{ supplier.name }}</td>
+                        <td>{{ supplier.contact_person or 'Not specified' }}</td>
+                        <td>
+                            {% if supplier.email %}
+                                <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
+                            {% else %}
+                                Not provided
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if supplier.phone %}
+                                <a href="tel:{{ supplier.phone }}">{{ supplier.phone }}</a>
+                            {% else %}
+                                Not provided
+                            {% endif %}
+                        </td>
+                        <td class="quantity">
+                            <span class="quantity-number">{{ supplier.products|length }} products</span>
+                            {% if supplier.products|length > 0 %}
+                                <a href="#" class="btn btn-small btn-secondary" 
+                                   onclick="showSupplierProducts({{ supplier.id }}, '{{ supplier.name }}')">
+                                   View Products
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <div class="action-buttons">
+                                <a href="{{ url_for('edit_supplier', id=supplier.id) }}" 
+                                   class="btn btn-small btn-secondary">✏️ Edit</a>
+                                <button class="btn btn-small btn-danger" 
+                                        onclick="deleteSupplier({{ supplier.id }}, '{{ supplier.name }}', {{ supplier.products|length }})">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No Suppliers Yet</h3>
+            <p>You haven't added any suppliers to your system yet.</p>
+            <a href="{{ url_for('add_supplier') }}" class="btn btn-primary">Add Your First Supplier</a>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function deleteSupplier(id, name, productCount) {
+    if (productCount > 0) {
+        alert(`Cannot delete "${name}" because it has ${productCount} products assigned.\n\nPlease remove all products from this supplier first.`);
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete supplier "${name}"?\n\nThis action cannot be undone.`)) {
+        window.location.href = `/delete_supplier/${id}`;
+    }
+}
+
+function showSupplierProducts(id, name) {
+    // For now, show an alert. Later we'll make a proper page for this
+    alert(`Products from "${name}" will be shown here in a future update.`);
+}
+</script>
+{% endblock %}

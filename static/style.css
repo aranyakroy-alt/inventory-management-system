@@ -754,3 +754,31 @@ body {
         height: 32px;
     }
 }
+
+/* Supplier dropdown styling */
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+    background-color: white;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.supplier {
+    min-width: 120px;
+}
+
+.supplier strong {
+    color: #2c3e50;
+}
+
+.supplier small {
+    color: #7f8c8d;
+}

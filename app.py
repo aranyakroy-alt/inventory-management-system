@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-from models import db, Product
+from models import db, Product, Supplier
 import os
 
 # Create Flask application
@@ -61,6 +61,13 @@ def add_product():
             description = request.form['description']
             price = float(request.form['price'])
             quantity = int(request.form['quantity'])
+            supplier_id = request.form.get('supplier_id')
+            
+            # Convert empty string to None for supplier_id
+            if supplier_id == '':
+                supplier_id = None
+            else:
+                supplier_id = int(supplier_id)
             
             # Create new product
             new_product = Product(
@@ -68,7 +75,8 @@ def add_product():
                 sku=sku,
                 description=description,
                 price=price,
-                quantity=quantity
+                quantity=quantity,
+                supplier_id=supplier_id
             )
             
             # Add to database
@@ -83,7 +91,9 @@ def add_product():
         except Exception as e:
             flash(f'Error adding product: {str(e)}', 'error')
     
-    return render_template('add_product.html')
+    # GET request - show the form with suppliers list
+    suppliers = Supplier.query.all()
+    return render_template('add_product.html', suppliers=suppliers)
 
 @app.route('/edit_product/<int:id>', methods=['GET', 'POST'])
 def edit_product(id):
@@ -99,12 +109,20 @@ def edit_product(id):
             description = request.form['description']
             price = float(request.form['price'])
             quantity = int(request.form['quantity'])
+            supplier_id = request.form.get('supplier_id')
+            
+            # Convert empty string to None for supplier_id
+            if supplier_id == '':
+                supplier_id = None
+            else:
+                supplier_id = int(supplier_id)
             
             # Check if SKU is unique (excluding current product)
             existing_product = Product.query.filter(Product.sku == sku, Product.id != id).first()
             if existing_product:
                 flash(f'SKU "{sku}" is already in use by another product.', 'error')
-                return render_template('edit_product.html', product=product)
+                suppliers = Supplier.query.all()
+                return render_template('edit_product.html', product=product, suppliers=suppliers)
             
             # Update the product
             product.name = name
@@ -112,6 +130,7 @@ def edit_product(id):
             product.description = description
             product.price = price
             product.quantity = quantity
+            product.supplier_id = supplier_id
             
             # Save to database
             db.session.commit()
@@ -124,8 +143,9 @@ def edit_product(id):
         except Exception as e:
             flash(f'Error updating product: {str(e)}', 'error')
     
-    # GET request - show the edit form with current data
-    return render_template('edit_product.html', product=product)
+    # GET request - show the edit form with current data and suppliers list
+    suppliers = Supplier.query.all()
+    return render_template('edit_product.html', product=product, suppliers=suppliers)
 
 @app.route('/delete_product/<int:id>')
 def delete_product(id):
@@ -225,6 +245,117 @@ def bulk_adjust_stock(id):
         flash(f'❌ Error adjusting stock: {str(e)}', 'error')
     
     return redirect(url_for('products'))
+
+# Add these routes to your app.py file, before the "if __name__ == '__main__':" line
+
+@app.route('/suppliers')
+def suppliers():
+    """Display all suppliers"""
+    all_suppliers = Supplier.query.all()
+    return render_template('suppliers.html', suppliers=all_suppliers)
+
+@app.route('/add_supplier', methods=['GET', 'POST'])
+def add_supplier():
+    """Add a new supplier"""
+    if request.method == 'POST':
+        try:
+            # Get form data
+            name = request.form['name']
+            contact_person = request.form.get('contact_person', '').strip()
+            email = request.form.get('email', '').strip()
+            phone = request.form.get('phone', '').strip()
+            address = request.form.get('address', '').strip()
+            
+            # Validate required fields
+            if not name.strip():
+                flash('Supplier name is required.', 'error')
+                return render_template('add_supplier.html')
+            
+            # Create new supplier
+            new_supplier = Supplier(
+                name=name.strip(),
+                contact_person=contact_person if contact_person else None,
+                email=email if email else None,
+                phone=phone if phone else None,
+                address=address if address else None
+            )
+            
+            # Add to database
+            db.session.add(new_supplier)
+            db.session.commit()
+            
+            flash(f'Supplier "{name}" added successfully!', 'success')
+            return redirect(url_for('suppliers'))
+            
+        except Exception as e:
+            flash(f'Error adding supplier: {str(e)}', 'error')
+    
+    return render_template('add_supplier.html')
+
+@app.route('/edit_supplier/<int:id>', methods=['GET', 'POST'])
+def edit_supplier(id):
+    """Edit an existing supplier"""
+    # Find the supplier or return 404 if not found
+    supplier = Supplier.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            name = request.form['name']
+            contact_person = request.form.get('contact_person', '').strip()
+            email = request.form.get('email', '').strip()
+            phone = request.form.get('phone', '').strip()
+            address = request.form.get('address', '').strip()
+            
+            # Validate required fields
+            if not name.strip():
+                flash('Supplier name is required.', 'error')
+                return render_template('edit_supplier.html', supplier=supplier)
+            
+            # Update the supplier
+            supplier.name = name.strip()
+            supplier.contact_person = contact_person if contact_person else None
+            supplier.email = email if email else None
+            supplier.phone = phone if phone else None
+            supplier.address = address if address else None
+            
+            # Save to database
+            db.session.commit()
+            
+            flash(f'Supplier "{name}" updated successfully!', 'success')
+            return redirect(url_for('suppliers'))
+            
+        except Exception as e:
+            flash(f'Error updating supplier: {str(e)}', 'error')
+    
+    # GET request - show the edit form with current data
+    return render_template('edit_supplier.html', supplier=supplier)
+
+@app.route('/delete_supplier/<int:id>')
+def delete_supplier(id):
+    """Delete a supplier"""
+    try:
+        # Find the supplier or return 404 if not found
+        supplier = Supplier.query.get_or_404(id)
+        
+        # Check if supplier has products
+        product_count = len(supplier.products)
+        if product_count > 0:
+            flash(f'Cannot delete "{supplier.name}" - it has {product_count} products assigned. Remove products first.', 'error')
+            return redirect(url_for('suppliers'))
+        
+        supplier_name = supplier.name  # Store name before deletion
+        
+        # Delete from database
+        db.session.delete(supplier)
+        db.session.commit()
+        
+        flash(f'Supplier "{supplier_name}" deleted successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error deleting supplier: {str(e)}', 'error')
+    
+    return redirect(url_for('suppliers'))
 
 # Run the application
 if __name__ == '__main__':
