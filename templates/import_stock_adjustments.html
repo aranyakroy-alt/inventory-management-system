@@ -1,0 +1,691 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="import-page">
+    <div class="page-header">
+        <h2>Import Stock Adjustments</h2>
+        <p>Upload a CSV file to bulk update product quantities</p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions-section">
+        <div class="instructions-card">
+            <h3>Stock Adjustment Import</h3>
+            <div class="instructions-content">
+                <p>Use this feature to update stock quantities for multiple products at once using a CSV file. This is useful for:</p>
+                <ul class="use-cases">
+                    <li>Physical inventory count adjustments</li>
+                    <li>Bulk stock corrections</li>
+                    <li>End-of-period adjustments</li>
+                    <li>Importing stock levels from external systems</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Format Requirements -->
+    <div class="format-section">
+        <h3>CSV Format Requirements</h3>
+        <div class="format-content">
+            <div class="required-format">
+                <h4>Required Columns</h4>
+                <div class="columns-grid">
+                    <div class="column-info">
+                        <strong>SKU</strong>
+                        <p>Product SKU code (must match existing products)</p>
+                    </div>
+                    <div class="column-info">
+                        <strong>New_Quantity</strong>
+                        <p>Target stock quantity (whole number, 0 or positive)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="optional-format">
+                <h4>Optional Columns</h4>
+                <div class="columns-grid">
+                    <div class="column-info">
+                        <strong>Current_Quantity</strong>
+                        <p>Reference field (for your records, not used in import)</p>
+                    </div>
+                    <div class="column-info">
+                        <strong>Reason</strong>
+                        <p>Specific reason for this adjustment</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="format-notes">
+                <h4>Important Notes</h4>
+                <ul>
+                    <li><strong>SKU Matching:</strong> SKUs must exactly match existing products</li>
+                    <li><strong>Transaction Logging:</strong> All changes will create transaction records</li>
+                    <li><strong>Unchanged Values:</strong> Products already at the specified quantity will be skipped</li>
+                    <li><strong>Validation:</strong> Negative quantities will be rejected</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Download -->
+    <div class="template-section">
+        <h3>Download Template</h3>
+        <div class="template-card">
+            <div class="template-info">
+                <h4>Stock Adjustments Template</h4>
+                <p>Pre-populated CSV with your current products and stock levels</p>
+                <ul>
+                    <li>Current SKUs and quantities</li>
+                    <li>Ready for quantity updates</li>
+                    <li>Includes reason column</li>
+                </ul>
+            </div>
+            <div class="template-actions">
+                <a href="{{ url_for('download_template', template_type='stock_adjustments') }}" 
+                   class="btn btn-secondary template-btn">
+                    Download Current Inventory Template
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Form -->
+    <div class="upload-section">
+        <h3>Upload Stock Adjustments</h3>
+        <form method="POST" enctype="multipart/form-data" class="upload-form" onsubmit="return validateUpload()">
+            <!-- Reason Field -->
+            <div class="reason-section">
+                <div class="form-group">
+                    <label for="reason">Reason for Stock Adjustments *</label>
+                    <input type="text" 
+                           id="reason" 
+                           name="reason" 
+                           required 
+                           class="form-control"
+                           placeholder="e.g., Physical inventory count, System correction, Damage adjustment">
+                    <small class="help-text">This reason will be used for all adjustments that don't have specific reasons in the CSV</small>
+                </div>
+            </div>
+
+            <!-- File Upload -->
+            <div class="upload-area">
+                <div class="upload-box">
+                    <div class="upload-icon">📊</div>
+                    <div class="upload-text">
+                        <h4>Select Stock Adjustments CSV</h4>
+                        <p>Choose your stock adjustments file to upload</p>
+                    </div>
+                    <input type="file" 
+                           name="csv_file" 
+                           id="csv_file" 
+                           accept=".csv" 
+                           required 
+                           class="file-input"
+                           onchange="showFileName(this)">
+                </div>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-actions">
+                        <button type="button" class="btn btn-small btn-secondary" onclick="clearFile()">
+                            Change File
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="upload-controls">
+                <button type="submit" class="btn btn-primary upload-btn" id="uploadBtn" disabled>
+                    Import Stock Adjustments
+                </button>
+                <a href="{{ url_for('import_export') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Example Section -->
+    <div class="example-section">
+        <h3>Example CSV Format</h3>
+        <div class="example-card">
+            <div class="example-preview">
+                <table class="example-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Current_Quantity</th>
+                            <th>New_Quantity</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>PROD-001</td>
+                            <td>50</td>
+                            <td>47</td>
+                            <td>Physical count variance</td>
+                        </tr>
+                        <tr>
+                            <td>PROD-002</td>
+                            <td>25</td>
+                            <td>30</td>
+                            <td>Found additional units</td>
+                        </tr>
+                        <tr>
+                            <td>PROD-003</td>
+                            <td>0</td>
+                            <td>100</td>
+                            <td>New shipment received</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="example-notes">
+                <h4>This example would:</h4>
+                <ul>
+                    <li>Decrease PROD-001 from 50 to 47 units (-3 change)</li>
+                    <li>Increase PROD-002 from 25 to 30 units (+5 change)</li>
+                    <li>Increase PROD-003 from 0 to 100 units (+100 change)</li>
+                    <li>Create 3 transaction records with individual reasons</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning-section">
+        <div class="warning-card">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-content">
+                <h4>Before Importing Stock Adjustments</h4>
+                <ul>
+                    <li><strong>Backup First:</strong> Export your current data before making bulk changes</li>
+                    <li><strong>Verify SKUs:</strong> Ensure all SKUs in your CSV match existing products</li>
+                    <li><strong>Double-Check Quantities:</strong> Review all new quantities for accuracy</li>
+                    <li><strong>Test Small Batch:</strong> Consider testing with a few products first</li>
+                    <li><strong>Audit Trail:</strong> All changes will be logged with timestamps and reasons</li>
+                    <li><strong>Cannot Undo:</strong> Stock adjustments cannot be automatically reversed</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.import-page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+    border-radius: 12px;
+}
+
+.page-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+}
+
+.page-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+/* Instructions */
+.instructions-section,
+.format-section,
+.template-section,
+.upload-section,
+.example-section,
+.warning-section {
+    margin-bottom: 2rem;
+}
+
+.instructions-card,
+.upload-form,
+.warning-card,
+.example-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.instructions-card h3,
+.format-section h3,
+.template-section h3,
+.upload-section h3,
+.example-section h3 {
+    color: #2c3e50;
+    margin: 0 0 1.5rem 0;
+    text-align: center;
+}
+
+.instructions-content p {
+    color: #7f8c8d;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.use-cases {
+    margin: 0;
+    padding-left: 1.5rem;
+    color: #7f8c8d;
+}
+
+.use-cases li {
+    margin-bottom: 0.5rem;
+}
+
+/* Format Section */
+.format-section {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 12px;
+}
+
+.format-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.required-format,
+.optional-format {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.required-format h4 {
+    color: #e74c3c;
+    margin: 0 0 1rem 0;
+}
+
+.optional-format h4 {
+    color: #3498db;
+    margin: 0 0 1rem 0;
+}
+
+.columns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.column-info {
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 3px solid;
+}
+
+.required-format .column-info {
+    background: #fff5f5;
+    border-left-color: #e74c3c;
+}
+
+.optional-format .column-info {
+    background: #f0f8ff;
+    border-left-color: #3498db;
+}
+
+.column-info strong {
+    display: block;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.column-info p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.format-notes {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.format-notes h4 {
+    color: #2c3e50;
+    margin: 0 0 1rem 0;
+}
+
+.format-notes ul {
+    margin: 0;
+    color: #7f8c8d;
+}
+
+.format-notes li {
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+/* Template Section */
+.template-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.template-info {
+    flex: 1;
+}
+
+.template-info h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+}
+
+.template-info p {
+    color: #7f8c8d;
+    margin: 0 0 1rem 0;
+}
+
+.template-info ul {
+    margin: 0;
+    color: #7f8c8d;
+}
+
+.template-actions {
+    text-align: center;
+}
+
+.template-btn {
+    padding: 1rem 1.5rem;
+    font-weight: 500;
+    border-radius: 8px;
+}
+
+/* Upload Section */
+.reason-section {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-control {
+    width: 100%;
+    max-width: 500px;
+    padding: 0.75rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #f39c12;
+}
+
+.help-text {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.upload-area {
+    margin-bottom: 2rem;
+}
+
+.upload-box {
+    border: 2px dashed #bdc3c7;
+    border-radius: 12px;
+    padding: 3rem;
+    text-align: center;
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+}
+
+.upload-box:hover {
+    border-color: #f39c12;
+    background-color: #fffaf0;
+}
+
+.upload-box.has-file {
+    border-color: #f39c12;
+    background-color: #fffaf0;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+}
+
+.upload-text h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+}
+
+.upload-text p {
+    color: #7f8c8d;
+    margin: 0;
+}
+
+.file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.file-info {
+    text-align: center;
+    padding: 1.5rem;
+    background: #fffaf0;
+    border-radius: 8px;
+    border: 1px solid #f39c12;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.upload-controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.upload-btn {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.upload-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Example Section */
+.example-preview {
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+}
+
+.example-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.example-table th {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 500;
+}
+
+.example-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #ecf0f1;
+    font-family: monospace;
+}
+
+.example-table tr:last-child td {
+    border-bottom: none;
+}
+
+.example-notes h4 {
+    color: #2c3e50;
+    margin: 0 0 1rem 0;
+}
+
+.example-notes ul {
+    margin: 0;
+    color: #7f8c8d;
+}
+
+.example-notes li {
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+/* Warning */
+.warning-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+}
+
+.warning-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.warning-content h4 {
+    color: #856404;
+    margin: 0 0 1rem 0;
+}
+
+.warning-content ul {
+    margin: 0;
+    color: #856404;
+}
+
+.warning-content li {
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .template-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .columns-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .upload-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .form-control {
+        max-width: none;
+    }
+}
+</style>
+
+<script>
+function showFileName(input) {
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const uploadBox = document.querySelector('.upload-box');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    if (input.files && input.files[0]) {
+        fileName.textContent = input.files[0].name;
+        fileInfo.style.display = 'block';
+        uploadBox.style.display = 'none';
+        uploadBox.classList.add('has-file');
+        uploadBtn.disabled = false;
+    }
+}
+
+function clearFile() {
+    const fileInput = document.getElementById('csv_file');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadBox = document.querySelector('.upload-box');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    fileInput.value = '';
+    fileInfo.style.display = 'none';
+    uploadBox.style.display = 'block';
+    uploadBox.classList.remove('has-file');
+    uploadBtn.disabled = true;
+}
+
+function validateUpload() {
+    const fileInput = document.getElementById('csv_file');
+    const reasonInput = document.getElementById('reason');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Please select a CSV file to upload.');
+        return false;
+    }
+    
+    if (!reasonInput.value.trim()) {
+        alert('Please provide a reason for these stock adjustments.');
+        reasonInput.focus();
+        return false;
+    }
+    
+    const file = fileInput.files[0];
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('Please select a CSV file (.csv extension).');
+        return false;
+    }
+    
+    return confirm('Are you sure you want to import stock adjustments from this CSV file?\n\n' +
+                  'This will:\n' +
+                  '• Update product quantities for matching SKUs\n' +
+                  '• Create transaction records for all changes\n' +
+                  '• Skip products that are already at the target quantity\n' +
+                  '• Reject any negative quantities\n\n' +
+                  'Reason: "' + reasonInput.value.trim() + '"\n\n' +
+                  'Click OK to proceed with the import.');
+}
+</script>
+{% endblock %}

@@ -1,6 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 import os
 from models import db, Product, Supplier, StockTransaction, ReorderPoint
+import csv
+import io
+from flask import make_response
+from datetime import datetime
 
 def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
     """
@@ -778,6 +782,587 @@ def dashboard():
     }
     
     return render_template('dashboard.html', data=dashboard_data)
+
+@app.route('/export/products')
+def export_products():
+    """Export all products to CSV format"""
+    try:
+        # Create CSV data in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header row
+        writer.writerow([
+            'ID', 'Name', 'SKU', 'Description', 'Price', 'Quantity', 
+            'Supplier', 'Created Date', 'Stock Status', 'Total Value'
+        ])
+        
+        # Get all products with supplier information
+        products = Product.query.outerjoin(Supplier).all()
+        
+        for product in products:
+            # Determine stock status
+            if product.quantity == 0:
+                stock_status = 'Out of Stock'
+            elif product.quantity < 10:
+                stock_status = 'Low Stock'
+            else:
+                stock_status = 'In Stock'
+            
+            # Calculate total value
+            total_value = product.price * product.quantity
+            
+            # Get supplier name
+            supplier_name = product.supplier.name if product.supplier else 'No Supplier'
+            
+            # Write product row
+            writer.writerow([
+                product.id,
+                product.name,
+                product.sku,
+                product.description or '',
+                f"{product.price:.2f}",
+                product.quantity,
+                supplier_name,
+                product.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                stock_status,
+                f"{total_value:.2f}"
+            ])
+        
+        # Create response
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=products_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        flash('Products exported successfully!', 'success')
+        return response
+        
+    except Exception as e:
+        flash(f'Export failed: {str(e)}', 'error')
+        return redirect(url_for('products'))
+
+@app.route('/export/transactions')
+def export_transactions():
+    """Export transaction history to CSV format"""
+    try:
+        # Create CSV data in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header row
+        writer.writerow([
+            'Transaction ID', 'Date', 'Time', 'Product Name', 'SKU', 
+            'Transaction Type', 'Quantity Change', 'Quantity Before', 
+            'Quantity After', 'Reason', 'Notes'
+        ])
+        
+        # Get all transactions with product information
+        transactions = StockTransaction.query.join(Product).order_by(
+            StockTransaction.created_at.desc()
+        ).all()
+        
+        for transaction in transactions:
+            writer.writerow([
+                transaction.id,
+                transaction.created_at.strftime('%Y-%m-%d'),
+                transaction.created_at.strftime('%H:%M:%S'),
+                transaction.product.name,
+                transaction.product.sku,
+                transaction.transaction_type.replace('_', ' ').title(),
+                transaction.quantity_change,
+                transaction.quantity_before,
+                transaction.quantity_after,
+                transaction.reason or '',
+                transaction.user_notes or ''
+            ])
+        
+        # Create response
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=transactions_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        flash('Transaction history exported successfully!', 'success')
+        return response
+        
+    except Exception as e:
+        flash(f'Export failed: {str(e)}', 'error')
+        return redirect(url_for('transactions'))
+
+@app.route('/export/alerts')
+def export_alerts():
+    """Export current alert status to CSV format"""
+    try:
+        # Create CSV data in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header row
+        writer.writerow([
+            'Product Name', 'SKU', 'Current Stock', 'Minimum Threshold', 
+            'Reorder Quantity', 'Alert Level', 'Suggested Order', 
+            'Supplier', 'Total Value', 'Status'
+        ])
+        
+        # Get all products with reorder points
+        reorder_points = ReorderPoint.query.join(Product).outerjoin(Supplier).all()
+        
+        for reorder_point in reorder_points:
+            product = reorder_point.product
+            
+            # Calculate suggested order and total value
+            suggested_order = reorder_point.suggested_order_amount
+            total_value = product.price * product.quantity
+            supplier_name = product.supplier.name if product.supplier else 'No Supplier'
+            
+            # Determine status
+            if not reorder_point.is_active:
+                status = 'Alerts Disabled'
+            else:
+                status = 'Active Monitoring'
+            
+            writer.writerow([
+                product.name,
+                product.sku,
+                product.quantity,
+                reorder_point.minimum_quantity,
+                reorder_point.reorder_quantity,
+                reorder_point.alert_level.title(),
+                suggested_order,
+                supplier_name,
+                f"{total_value:.2f}",
+                status
+            ])
+        
+        # Create response
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=alerts_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        
+        flash('Alert status exported successfully!', 'success')
+        return response
+        
+    except Exception as e:
+        flash(f'Export failed: {str(e)}', 'error')
+        return redirect(url_for('alerts'))
+
+@app.route('/import_export')
+def import_export():
+    """Import/Export management page"""
+    # Get summary statistics for the import/export page
+    stats = {
+        'total_products': Product.query.count(),
+        'total_transactions': StockTransaction.query.count(),
+        'total_suppliers': Supplier.query.count(),
+        'active_alerts': ReorderPoint.query.filter(ReorderPoint.is_active == True).count(),
+        'last_transaction': StockTransaction.query.order_by(StockTransaction.created_at.desc()).first()
+    }
+    
+    return render_template('import_export.html', stats=stats)
+
+@app.route('/bulk_operations')
+def bulk_operations():
+    """Bulk stock operations interface"""
+    # Get all products for bulk operations
+    products = Product.query.order_by(Product.name).all()
+    
+    return render_template('bulk_operations.html', products=products)
+
+@app.route('/bulk_stock_update', methods=['POST'])
+def bulk_stock_update():
+    """Process bulk stock updates"""
+    try:
+        # Get the operation type
+        operation_type = request.form.get('operation_type')
+        reason = request.form.get('reason', 'Bulk operation')
+        
+        updates_made = 0
+        errors = []
+        
+        # Process each product update
+        for key, value in request.form.items():
+            if key.startswith('product_') and value.strip():
+                try:
+                    product_id = int(key.replace('product_', ''))
+                    new_quantity = int(value)
+                    
+                    if new_quantity < 0:
+                        errors.append(f"Product ID {product_id}: Negative quantity not allowed")
+                        continue
+                    
+                    product = Product.query.get(product_id)
+                    if not product:
+                        errors.append(f"Product ID {product_id}: Not found")
+                        continue
+                    
+                    # Check if quantity actually changed
+                    if product.quantity != new_quantity:
+                        old_quantity = product.quantity
+                        quantity_change = new_quantity - old_quantity
+                        
+                        # Create transaction record
+                        transaction = StockTransaction(
+                            product_id=product.id,
+                            transaction_type='bulk_adjustment',
+                            quantity_change=quantity_change,
+                            quantity_before=old_quantity,
+                            quantity_after=new_quantity,
+                            reason=f"Bulk operation: {reason}",
+                            user_notes=f"Updated via bulk operations interface"
+                        )
+                        
+                        # Update product quantity
+                        product.quantity = new_quantity
+                        
+                        # Add transaction to session
+                        db.session.add(transaction)
+                        updates_made += 1
+                
+                except ValueError:
+                    errors.append(f"Product ID {key}: Invalid quantity value")
+                except Exception as e:
+                    errors.append(f"Product ID {key}: {str(e)}")
+        
+        # Commit all changes
+        if updates_made > 0:
+            db.session.commit()
+            flash(f'Bulk update completed: {updates_made} products updated successfully!', 'success')
+        
+        if errors:
+            error_msg = f"{len(errors)} errors occurred: " + "; ".join(errors[:5])
+            if len(errors) > 5:
+                error_msg += f" (and {len(errors)-5} more...)"
+            flash(error_msg, 'error')
+        
+        if updates_made == 0 and not errors:
+            flash('No changes were made - all quantities were already at specified values', 'info')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Bulk update failed: {str(e)}', 'error')
+    
+    return redirect(url_for('bulk_operations'))
+
+# ADD these additional routes to your app.py file (after the export routes)
+
+@app.route('/import_products', methods=['GET', 'POST'])
+def import_products():
+    """Import products from CSV file"""
+    if request.method == 'POST':
+        try:
+            # Check if file was uploaded
+            if 'csv_file' not in request.files:
+                flash('No file selected', 'error')
+                return redirect(request.url)
+            
+            file = request.files['csv_file']
+            if file.filename == '':
+                flash('No file selected', 'error')
+                return redirect(request.url)
+            
+            if not file.filename.lower().endswith('.csv'):
+                flash('Please upload a CSV file', 'error')
+                return redirect(request.url)
+            
+            # Read CSV content
+            csv_content = file.read().decode('utf-8')
+            csv_reader = csv.DictReader(io.StringIO(csv_content))
+            
+            # Validate CSV headers
+            required_headers = ['Name', 'SKU', 'Price', 'Quantity']
+            optional_headers = ['Description', 'Supplier']
+            
+            if not all(header in csv_reader.fieldnames for header in required_headers):
+                missing_headers = [h for h in required_headers if h not in csv_reader.fieldnames]
+                flash(f'CSV missing required headers: {", ".join(missing_headers)}', 'error')
+                return redirect(request.url)
+            
+            # Track import results
+            imported_count = 0
+            updated_count = 0
+            error_count = 0
+            errors = []
+            
+            # Process each row
+            for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 because row 1 is headers
+                try:
+                    # Validate required fields
+                    name = row['Name'].strip()
+                    sku = row['SKU'].strip()
+                    price = float(row['Price'])
+                    quantity = int(row['Quantity'])
+                    
+                    if not name or not sku:
+                        errors.append(f"Row {row_num}: Name and SKU are required")
+                        error_count += 1
+                        continue
+                    
+                    if price < 0 or quantity < 0:
+                        errors.append(f"Row {row_num}: Price and quantity cannot be negative")
+                        error_count += 1
+                        continue
+                    
+                    # Optional fields
+                    description = row.get('Description', '').strip() or None
+                    supplier_name = row.get('Supplier', '').strip()
+                    
+                    # Find or create supplier
+                    supplier_id = None
+                    if supplier_name:
+                        supplier = Supplier.query.filter_by(name=supplier_name).first()
+                        if not supplier:
+                            # Create new supplier
+                            supplier = Supplier(name=supplier_name)
+                            db.session.add(supplier)
+                            db.session.flush()  # Get the ID
+                        supplier_id = supplier.id
+                    
+                    # Check if product exists (by SKU)
+                    existing_product = Product.query.filter_by(sku=sku).first()
+                    
+                    if existing_product:
+                        # Update existing product
+                        old_quantity = existing_product.quantity
+                        
+                        existing_product.name = name
+                        existing_product.description = description
+                        existing_product.price = price
+                        existing_product.quantity = quantity
+                        existing_product.supplier_id = supplier_id
+                        
+                        # Create transaction if quantity changed
+                        if old_quantity != quantity:
+                            quantity_change = quantity - old_quantity
+                            transaction = StockTransaction(
+                                product_id=existing_product.id,
+                                transaction_type='import_adjustment',
+                                quantity_change=quantity_change,
+                                quantity_before=old_quantity,
+                                quantity_after=quantity,
+                                reason=f'Updated via CSV import',
+                                user_notes=f'Product updated from CSV file: {file.filename}'
+                            )
+                            db.session.add(transaction)
+                        
+                        updated_count += 1
+                    else:
+                        # Create new product
+                        new_product = Product(
+                            name=name,
+                            sku=sku,
+                            description=description,
+                            price=price,
+                            quantity=quantity,
+                            supplier_id=supplier_id
+                        )
+                        db.session.add(new_product)
+                        db.session.flush()  # Get the product ID
+                        
+                        # Create initial stock transaction
+                        if quantity > 0:
+                            transaction = StockTransaction(
+                                product_id=new_product.id,
+                                transaction_type='import_initial',
+                                quantity_change=quantity,
+                                quantity_before=0,
+                                quantity_after=quantity,
+                                reason=f'Initial stock via CSV import',
+                                user_notes=f'Product created from CSV file: {file.filename}'
+                            )
+                            db.session.add(transaction)
+                        
+                        imported_count += 1
+                
+                except ValueError as e:
+                    errors.append(f"Row {row_num}: Invalid number format")
+                    error_count += 1
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+                    error_count += 1
+            
+            # Commit all changes
+            db.session.commit()
+            
+            # Create success message
+            success_parts = []
+            if imported_count > 0:
+                success_parts.append(f"{imported_count} new products imported")
+            if updated_count > 0:
+                success_parts.append(f"{updated_count} existing products updated")
+            
+            if success_parts:
+                flash(f"Import completed: {', '.join(success_parts)}", 'success')
+            
+            if error_count > 0:
+                error_msg = f"{error_count} errors encountered"
+                if len(errors) <= 5:
+                    error_msg += ": " + "; ".join(errors)
+                else:
+                    error_msg += f": {errors[0]} (and {len(errors)-1} more...)"
+                flash(error_msg, 'error')
+            
+            return redirect(url_for('products'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Import failed: {str(e)}', 'error')
+    
+    return render_template('import_products.html')
+
+@app.route('/download_template/<template_type>')
+def download_template(template_type):
+    """Download CSV templates for importing data"""
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        if template_type == 'products':
+            # Products template
+            writer.writerow(['Name', 'SKU', 'Description', 'Price', 'Quantity', 'Supplier'])
+            writer.writerow(['Example Product 1', 'PROD-001', 'Sample product description', '19.99', '100', 'Example Supplier'])
+            writer.writerow(['Example Product 2', 'PROD-002', 'Another product description', '29.99', '50', 'Another Supplier'])
+            filename = 'products_import_template.csv'
+            
+        elif template_type == 'stock_adjustments':
+            # Stock adjustments template (for bulk updates via import)
+            products = Product.query.all()
+            writer.writerow(['SKU', 'Current_Quantity', 'New_Quantity', 'Reason'])
+            for product in products[:5]:  # Show first 5 as examples
+                writer.writerow([product.sku, product.quantity, product.quantity, 'Adjustment reason'])
+            filename = 'stock_adjustments_template.csv'
+            
+        else:
+            flash('Invalid template type', 'error')
+            return redirect(url_for('import_export'))
+        
+        # Create response
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Template download failed: {str(e)}', 'error')
+        return redirect(url_for('import_export'))
+
+@app.route('/import_stock_adjustments', methods=['GET', 'POST'])
+def import_stock_adjustments():
+    """Import stock adjustments from CSV file"""
+    if request.method == 'POST':
+        try:
+            # Check if file was uploaded
+            if 'csv_file' not in request.files:
+                flash('No file selected', 'error')
+                return redirect(request.url)
+            
+            file = request.files['csv_file']
+            if file.filename == '':
+                flash('No file selected', 'error')
+                return redirect(request.url)
+            
+            if not file.filename.lower().endswith('.csv'):
+                flash('Please upload a CSV file', 'error')
+                return redirect(request.url)
+            
+            # Get reason for bulk adjustment
+            bulk_reason = request.form.get('reason', '').strip()
+            if not bulk_reason:
+                flash('Please provide a reason for the stock adjustments', 'error')
+                return redirect(request.url)
+            
+            # Read CSV content
+            csv_content = file.read().decode('utf-8')
+            csv_reader = csv.DictReader(io.StringIO(csv_content))
+            
+            # Validate CSV headers
+            required_headers = ['SKU', 'New_Quantity']
+            if not all(header in csv_reader.fieldnames for header in required_headers):
+                missing_headers = [h for h in required_headers if h not in csv_reader.fieldnames]
+                flash(f'CSV missing required headers: {", ".join(missing_headers)}', 'error')
+                return redirect(request.url)
+            
+            # Track import results
+            updated_count = 0
+            error_count = 0
+            errors = []
+            
+            # Process each row
+            for row_num, row in enumerate(csv_reader, start=2):
+                try:
+                    sku = row['SKU'].strip()
+                    new_quantity = int(row['New_Quantity'])
+                    row_reason = row.get('Reason', '').strip() or bulk_reason
+                    
+                    if new_quantity < 0:
+                        errors.append(f"Row {row_num}: Negative quantity not allowed")
+                        error_count += 1
+                        continue
+                    
+                    # Find product by SKU
+                    product = Product.query.filter_by(sku=sku).first()
+                    if not product:
+                        errors.append(f"Row {row_num}: Product with SKU '{sku}' not found")
+                        error_count += 1
+                        continue
+                    
+                    # Check if quantity actually changed
+                    if product.quantity != new_quantity:
+                        old_quantity = product.quantity
+                        quantity_change = new_quantity - old_quantity
+                        
+                        # Create transaction
+                        transaction = StockTransaction(
+                            product_id=product.id,
+                            transaction_type='import_adjustment',
+                            quantity_change=quantity_change,
+                            quantity_before=old_quantity,
+                            quantity_after=new_quantity,
+                            reason=f'Stock adjustment import: {row_reason}',
+                            user_notes=f'Imported from CSV file: {file.filename}'
+                        )
+                        
+                        # Update product quantity
+                        product.quantity = new_quantity
+                        
+                        # Add transaction
+                        db.session.add(transaction)
+                        updated_count += 1
+                
+                except ValueError:
+                    errors.append(f"Row {row_num}: Invalid quantity value")
+                    error_count += 1
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+                    error_count += 1
+            
+            # Commit changes
+            db.session.commit()
+            
+            if updated_count > 0:
+                flash(f"Stock adjustments imported: {updated_count} products updated", 'success')
+            
+            if error_count > 0:
+                error_msg = f"{error_count} errors encountered"
+                if len(errors) <= 3:
+                    error_msg += ": " + "; ".join(errors)
+                else:
+                    error_msg += f": {errors[0]} (and {len(errors)-1} more...)"
+                flash(error_msg, 'error')
+            
+            if updated_count == 0 and error_count == 0:
+                flash('No changes were made - all quantities were already at specified values', 'info')
+            
+            return redirect(url_for('transactions'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Import failed: {str(e)}', 'error')
+    
+    return render_template('import_stock_adjustments.html')
 
 # Run the application
 if __name__ == '__main__':

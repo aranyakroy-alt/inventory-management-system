@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="import-export-page">
+    <div class="page-header">
+        <h2>Import/Export Data Management</h2>
+        <p>Export your inventory data for backup, analysis, or sharing with external systems</p>
+    </div>
+
+    <!-- System Overview -->
+    <div class="overview-section">
+        <h3>Current System Overview</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.total_products }}</div>
+                <div class="stat-label">Products</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.total_suppliers }}</div>
+                <div class="stat-label">Suppliers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.total_transactions }}</div>
+                <div class="stat-label">Transactions</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.active_alerts }}</div>
+                <div class="stat-label">Active Alerts</div>
+            </div>
+        </div>
+        {% if stats.last_transaction %}
+        <div class="last-activity">
+            <strong>Last Activity:</strong> 
+            {{ stats.last_transaction.transaction_display }} for "{{ stats.last_transaction.product.name }}" 
+            on {{ stats.last_transaction.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Import Options -->
+    <div class="import-section">
+        <h3>Import Data</h3>
+        <div class="import-grid">
+            <!-- Products Import -->
+            <div class="import-card">
+                <div class="import-header">
+                    <div class="import-icon">📥</div>
+                    <div class="import-title">
+                        <h4>Import Products</h4>
+                        <p>Add new products or update existing ones from CSV file</p>
+                    </div>
+                </div>
+                <div class="import-details">
+                    <strong>Features:</strong>
+                    <ul>
+                        <li>Create new products automatically</li>
+                        <li>Update existing products by SKU</li>
+                        <li>Auto-create suppliers if they don't exist</li>
+                        <li>Transaction logging for stock changes</li>
+                        <li>Comprehensive validation and error reporting</li>
+                    </ul>
+                </div>
+                <div class="import-actions">
+                    <a href="{{ url_for('import_products') }}" class="btn btn-success import-btn">
+                        📥 Import Products
+                    </a>
+                    <small class="file-info">Supports CSV with Name, SKU, Price, Quantity</small>
+                </div>
+            </div>
+
+            <!-- Stock Adjustments Import -->
+            <div class="import-card">
+                <div class="import-header">
+                    <div class="import-icon">📊</div>
+                    <div class="import-title">
+                        <h4>Import Stock Adjustments</h4>
+                        <p>Bulk update product quantities with audit trail</p>
+                    </div>
+                </div>
+                <div class="import-details">
+                    <strong>Features:</strong>
+                    <ul>
+                        <li>Update multiple product quantities at once</li>
+                        <li>Automatic transaction logging</li>
+                        <li>SKU-based product matching</li>
+                        <li>Individual or bulk adjustment reasons</li>
+                        <li>Validation prevents negative quantities</li>
+                    </ul>
+                </div>
+                <div class="import-actions">
+                    <a href="{{ url_for('import_stock_adjustments') }}" class="btn btn-warning import-btn">
+                        📊 Import Stock Adjustments
+                    </a>
+                    <small class="file-info">Supports CSV with SKU, New_Quantity</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Options -->
+    <div class="export-section">
+        <h3>Export Data</h3>
+        <div class="export-grid">
+            <!-- Products Export -->
+            <div class="export-card">
+                <div class="export-header">
+                    <div class="export-icon">📦</div>
+                    <div class="export-title">
+                        <h4>Products Export</h4>
+                        <p>Complete product inventory with stock levels, pricing, and supplier information</p>
+                    </div>
+                </div>
+                <div class="export-details">
+                    <strong>Includes:</strong>
+                    <ul>
+                        <li>Product names, SKUs, descriptions</li>
+                        <li>Current stock quantities and prices</li>
+                        <li>Supplier assignments</li>
+                        <li>Stock status and total values</li>
+                        <li>Creation dates</li>
+                    </ul>
+                </div>
+                <div class="export-actions">
+                    <a href="{{ url_for('export_products') }}" class="btn btn-primary export-btn">
+                        📥 Export Products CSV
+                    </a>
+                    <small class="file-info">Exports {{ stats.total_products }} products</small>
+                </div>
+            </div>
+
+            <!-- Transaction History Export -->
+            <div class="export-card">
+                <div class="export-header">
+                    <div class="export-icon">📊</div>
+                    <div class="export-title">
+                        <h4>Transaction History</h4>
+                        <p>Complete audit trail of all stock movements and adjustments</p>
+                    </div>
+                </div>
+                <div class="export-details">
+                    <strong>Includes:</strong>
+                    <ul>
+                        <li>All stock adjustments with timestamps</li>
+                        <li>Before/after quantities</li>
+                        <li>Transaction types and reasons</li>
+                        <li>Product information and notes</li>
+                    </ul>
+                </div>
+                <div class="export-actions">
+                    <a href="{{ url_for('export_transactions') }}" class="btn btn-primary export-btn">
+                        📥 Export Transactions CSV
+                    </a>
+                    <small class="file-info">Exports {{ stats.total_transactions }} transactions</small>
+                </div>
+            </div>
+
+            <!-- Alerts Export -->
+            <div class="export-card">
+                <div class="export-header">
+                    <div class="export-icon">⚠️</div>
+                    <div class="export-title">
+                        <h4>Alert Configuration</h4>
+                        <p>Current reorder points and alert status for all products</p>
+                    </div>
+                </div>
+                <div class="export-details">
+                    <strong>Includes:</strong>
+                    <ul>
+                        <li>Minimum stock thresholds</li>
+                        <li>Reorder quantities</li>
+                        <li>Current alert levels</li>
+                        <li>Suggested order amounts</li>
+                        <li>Alert enable/disable status</li>
+                    </ul>
+                </div>
+                <div class="export-actions">
+                    <a href="{{ url_for('export_alerts') }}" class="btn btn-primary export-btn">
+                        📥 Export Alerts CSV
+                    </a>
+                    <small class="file-info">Exports {{ stats.active_alerts }} alert configurations</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Operations -->
+    <div class="bulk-section">
+        <h3>Bulk Operations</h3>
+        <div class="bulk-operations-card">
+            <div class="bulk-header">
+                <div class="bulk-icon">⚡</div>
+                <div class="bulk-title">
+                    <h4>Bulk Stock Updates</h4>
+                    <p>Update multiple product quantities simultaneously with transaction logging</p>
+                </div>
+            </div>
+            <div class="bulk-details">
+                <strong>Features:</strong>
+                <ul>
+                    <li>Update multiple products at once</li>
+                    <li>Automatic transaction logging</li>
+                    <li>Input validation and error handling</li>
+                    <li>Reason tracking for audit trails</li>
+                </ul>
+                <div class="bulk-warning">
+                    <strong>⚠️ Important:</strong> Bulk operations will create transaction records for all changes. 
+                    Make sure your quantities are accurate before submitting.
+                </div>
+            </div>
+            <div class="bulk-actions">
+                <a href="{{ url_for('bulk_operations') }}" class="btn btn-secondary bulk-btn">
+                    ⚡ Open Bulk Operations
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Management Tips -->
+    <div class="tips-section">
+        <h3>Data Management Tips</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <div class="tip-icon">💾</div>
+                <div class="tip-content">
+                    <h4>Regular Backups</h4>
+                    <p>Export your data regularly to maintain backups of your inventory information.</p>
+                </div>
+            </div>
+            <div class="tip-card">
+                <div class="tip-icon">📈</div>
+                <div class="tip-content">
+                    <h4>Analysis Ready</h4>
+                    <p>CSV files can be opened in Excel, Google Sheets, or other analysis tools.</p>
+                </div>
+            </div>
+            <div class="tip-card">
+                <div class="tip-icon">🔄</div>
+                <div class="tip-content">
+                    <h4>Integration</h4>
+                    <p>Use exported data to integrate with accounting systems or external tools.</p>
+                </div>
+            </div>
+            <div class="tip-card">
+                <div class="tip-icon">🛡️</div>
+                <div class="tip-content">
+                    <h4>Data Security</h4>
+                    <p>Store exported files securely and consider encrypting sensitive inventory data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.import-export-page {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+}
+
+.page-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+}
+
+.page-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+/* Overview Section */
+.overview-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.overview-section h3 {
+    color: #2c3e50;
+    margin: 0 0 1.5rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.stat-item:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #7f8c8d;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+}
+
+.last-activity {
+    color: #7f8c8d;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+/* Export Section */
+.export-section,
+.bulk-section {
+    margin-bottom: 3rem;
+}
+
+.export-section h3,
+.bulk-section h3,
+.tips-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+
+.export-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.export-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+    transition: all 0.2s;
+}
+
+.export-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+.export-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.export-icon {
+    font-size: 2rem;
+    opacity: 0.8;
+}
+
+.export-title h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.2rem;
+}
+
+.export-title p {
+    color: #7f8c8d;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.export-details {
+    margin-bottom: 1.5rem;
+}
+
+.export-details strong {
+    color: #2c3e50;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.export-details ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: #7f8c8d;
+}
+
+.export-details li {
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+}
+
+.export-actions {
+    text-align: center;
+}
+
+.export-btn,
+.bulk-btn {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.file-info {
+    display: block;
+    margin-top: 0.5rem;
+    color: #95a5a6;
+    font-style: italic;
+}
+
+/* Bulk Operations */
+.bulk-operations-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+}
+
+.bulk-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.bulk-icon {
+    font-size: 2rem;
+    opacity: 0.8;
+}
+
+.bulk-title h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+}
+
+.bulk-title p {
+    color: #7f8c8d;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.bulk-details {
+    margin-bottom: 2rem;
+}
+
+.bulk-warning {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    color: #856404;
+    font-size: 0.9rem;
+}
+
+.bulk-actions {
+    text-align: center;
+}
+
+/* Tips Section */
+.tips-section {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 12px;
+}
+
+.tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.tip-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.tip-icon {
+    font-size: 1.5rem;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.tip-content h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+}
+
+.tip-content p {
+    color: #7f8c8d;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .export-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .tips-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .export-header,
+    .bulk-header {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,708 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bulk-operations-page">
+    <div class="page-header">
+        <h2>Bulk Stock Operations</h2>
+        <p>Update multiple product quantities simultaneously with automatic transaction logging</p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions-section">
+        <div class="instructions-card">
+            <h3>How to Use Bulk Operations</h3>
+            <div class="instructions-grid">
+                <div class="instruction-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Review Current Stock</h4>
+                        <p>Check current quantities and identify products that need updates</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Enter New Quantities</h4>
+                        <p>Type the new stock quantity for each product you want to update</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Add Reason</h4>
+                        <p>Provide a reason for the bulk update for audit trail purposes</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Submit Changes</h4>
+                        <p>Review and submit - transactions will be logged automatically</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Important Warnings -->
+    <div class="warnings-section">
+        <div class="warning-card">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-content">
+                <h4>Important Reminders</h4>
+                <ul>
+                    <li><strong>Transaction Logging:</strong> All changes will create transaction records in your audit trail</li>
+                    <li><strong>Validation:</strong> Negative quantities are not allowed and will be rejected</li>
+                    <li><strong>Unchanged Values:</strong> Products with the same quantity won't create transactions</li>
+                    <li><strong>Error Handling:</strong> Invalid entries will be reported but won't stop other updates</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    {% if products %}
+    <!-- Bulk Update Form -->
+    <form method="POST" action="{{ url_for('bulk_stock_update') }}" class="bulk-form" onsubmit="return confirmBulkUpdate()">
+        <!-- Operation Details -->
+        <div class="operation-section">
+            <h3>Operation Details</h3>
+            <div class="operation-controls">
+                <div class="form-group">
+                    <label for="reason">Reason for Bulk Update *</label>
+                    <input type="text" id="reason" name="reason" required 
+                           placeholder="e.g., Physical inventory count, Stock replenishment, Year-end adjustment"
+                           class="form-control">
+                    <small class="help-text">This reason will be recorded in all transaction logs</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="products-section">
+            <div class="section-header">
+                <h3>Products ({{ products|length }} total)</h3>
+                <div class="table-controls">
+                    <button type="button" class="btn btn-secondary" onclick="clearAllFields()">Clear All</button>
+                    <button type="button" class="btn btn-info" onclick="selectHighValueProducts()">Select High Value</button>
+                    <button type="button" class="btn btn-warning" onclick="selectLowStockProducts()">Select Low Stock</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="bulk-table">
+                    <thead>
+                        <tr>
+                            <th>Product Information</th>
+                            <th>Current Stock</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                            <th>New Quantity</th>
+                            <th>Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr class="product-row" data-product-id="{{ product.id }}">
+                            <td class="product-info">
+                                <div class="product-name">{{ product.name }}</div>
+                                <div class="product-details">
+                                    <span class="sku">{{ product.sku }}</span>
+                                    {% if product.supplier %}
+                                        <span class="supplier">{{ product.supplier.name }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="current-stock">
+                                <span class="stock-number" data-current="{{ product.quantity }}">{{ product.quantity }}</span>
+                            </td>
+                            <td class="product-value">
+                                <div class="unit-price">${{ "%.2f"|format(product.price) }}</div>
+                                <div class="total-value">${{ "%.2f"|format(product.price * product.quantity) }}</div>
+                            </td>
+                            <td class="stock-status">
+                                {% if product.quantity == 0 %}
+                                    <span class="status out-of-stock">Out of Stock</span>
+                                {% elif product.quantity < 10 %}
+                                    <span class="status low-stock">Low Stock</span>
+                                {% else %}
+                                    <span class="status in-stock">In Stock</span>
+                                {% endif %}
+                            </td>
+                            <td class="new-quantity">
+                                <input type="number" 
+                                       name="product_{{ product.id }}" 
+                                       min="0" 
+                                       class="quantity-input"
+                                       data-product-name="{{ product.name }}"
+                                       placeholder="{{ product.quantity }}"
+                                       onchange="calculateChange(this)">
+                            </td>
+                            <td class="change-preview">
+                                <span class="change-indicator"></span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Summary and Submit -->
+        <div class="submit-section">
+            <div class="update-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Products to Update:</span>
+                    <span class="summary-value" id="updateCount">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Increases:</span>
+                    <span class="summary-value" id="increaseCount">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Decreases:</span>
+                    <span class="summary-value" id="decreaseCount">0</span>
+                </div>
+            </div>
+            
+            <div class="submit-controls">
+                <button type="submit" class="btn btn-primary bulk-submit" id="submitButton" disabled>
+                    Update Selected Products
+                </button>
+                <a href="{{ url_for('import_export') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </div>
+    </form>
+
+    {% else %}
+    <!-- No Products State -->
+    <div class="empty-state">
+        <h3>No Products Available</h3>
+        <p>Add some products to your inventory before using bulk operations.</p>
+        <a href="{{ url_for('add_product') }}" class="btn btn-primary">Add Your First Product</a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.bulk-operations-page {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    border-radius: 12px;
+}
+
+.page-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+}
+
+.page-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+/* Instructions */
+.instructions-section {
+    margin-bottom: 2rem;
+}
+
+.instructions-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.instructions-card h3 {
+    color: #2c3e50;
+    margin: 0 0 1.5rem 0;
+    text-align: center;
+}
+
+.instructions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.instruction-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #3498db;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.step-content h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.step-content p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Warnings */
+.warnings-section {
+    margin-bottom: 2rem;
+}
+
+.warning-card {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.warning-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.warning-content h4 {
+    color: #856404;
+    margin: 0 0 1rem 0;
+}
+
+.warning-content ul {
+    margin: 0;
+    color: #856404;
+}
+
+.warning-content li {
+    margin-bottom: 0.5rem;
+}
+
+/* Form Sections */
+.operation-section,
+.products-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.operation-section h3,
+.products-section h3 {
+    color: #2c3e50;
+    margin: 0 0 1.5rem 0;
+}
+
+.operation-controls {
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.help-text {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+/* Table Controls */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.table-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Bulk Table */
+.table-container {
+    overflow-x: auto;
+}
+
+.bulk-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.bulk-table th {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 0.75rem;
+    text-align: left;
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+}
+
+.bulk-table td {
+    padding: 1rem 0.75rem;
+    border-bottom: 1px solid #ecf0f1;
+    vertical-align: middle;
+}
+
+.product-row:hover {
+    background-color: #f8f9fa;
+}
+
+.product-info {
+    min-width: 200px;
+}
+
+.product-name {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.product-details {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    display: flex;
+    gap: 1rem;
+}
+
+.sku {
+    font-family: monospace;
+}
+
+.current-stock {
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #2c3e50;
+}
+
+.product-value {
+    text-align: right;
+}
+
+.unit-price {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.total-value {
+    font-weight: 500;
+    color: #27ae60;
+}
+
+.stock-status {
+    text-align: center;
+}
+
+.status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.in-stock {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.low-stock {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.out-of-stock {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.quantity-input {
+    width: 100px;
+    padding: 0.5rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.quantity-input:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.quantity-input.has-change {
+    border-color: #e74c3c;
+    background-color: #fff5f5;
+}
+
+.change-preview {
+    text-align: center;
+    min-width: 100px;
+}
+
+.change-indicator {
+    font-weight: bold;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.change-increase {
+    color: #27ae60;
+    background-color: #d4edda;
+}
+
+.change-decrease {
+    color: #e74c3c;
+    background-color: #f8d7da;
+}
+
+/* Submit Section */
+.submit-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.update-summary {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-label {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.submit-controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.bulk-submit {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.bulk-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .instructions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .table-controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .update-summary {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .submit-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+</style>
+
+<script>
+let updateCount = 0;
+let increaseCount = 0;
+let decreaseCount = 0;
+
+function calculateChange(input) {
+    const currentStock = parseInt(input.closest('tr').querySelector('[data-current]').dataset.current);
+    const newValue = parseInt(input.value);
+    const changeCell = input.closest('tr').querySelector('.change-indicator');
+    
+    if (isNaN(newValue) || newValue === currentStock) {
+        // No change or invalid input
+        changeCell.textContent = '';
+        changeCell.className = 'change-indicator';
+        input.classList.remove('has-change');
+    } else {
+        // Calculate change
+        const change = newValue - currentStock;
+        input.classList.add('has-change');
+        
+        if (change > 0) {
+            changeCell.textContent = `+${change}`;
+            changeCell.className = 'change-indicator change-increase';
+        } else {
+            changeCell.textContent = change.toString();
+            changeCell.className = 'change-indicator change-decrease';
+        }
+    }
+    
+    updateSummary();
+}
+
+function updateSummary() {
+    updateCount = 0;
+    increaseCount = 0;
+    decreaseCount = 0;
+    
+    document.querySelectorAll('.quantity-input').forEach(input => {
+        const currentStock = parseInt(input.closest('tr').querySelector('[data-current]').dataset.current);
+        const newValue = parseInt(input.value);
+        
+        if (!isNaN(newValue) && newValue !== currentStock) {
+            updateCount++;
+            if (newValue > currentStock) {
+                increaseCount++;
+            } else {
+                decreaseCount++;
+            }
+        }
+    });
+    
+    document.getElementById('updateCount').textContent = updateCount;
+    document.getElementById('increaseCount').textContent = increaseCount;
+    document.getElementById('decreaseCount').textContent = decreaseCount;
+    
+    // Enable/disable submit button
+    const submitButton = document.getElementById('submitButton');
+    submitButton.disabled = updateCount === 0;
+    submitButton.textContent = updateCount > 0 ? `Update ${updateCount} Products` : 'Update Selected Products';
+}
+
+function clearAllFields() {
+    document.querySelectorAll('.quantity-input').forEach(input => {
+        input.value = '';
+        input.classList.remove('has-change');
+        input.closest('tr').querySelector('.change-indicator').textContent = '';
+        input.closest('tr').querySelector('.change-indicator').className = 'change-indicator';
+    });
+    updateSummary();
+}
+
+function selectHighValueProducts() {
+    // Select products with total value > $100
+    document.querySelectorAll('.product-row').forEach(row => {
+        const totalValueText = row.querySelector('.total-value').textContent;
+        const totalValue = parseFloat(totalValueText.replace('$', '').replace(',', ''));
+        
+        if (totalValue > 100) {
+            const input = row.querySelector('.quantity-input');
+            const currentStock = parseInt(row.querySelector('[data-current]').dataset.current);
+            input.value = currentStock + 10; // Add 10 to high value products
+            calculateChange(input);
+        }
+    });
+}
+
+function selectLowStockProducts() {
+    // Select products with quantity < 10
+    document.querySelectorAll('.product-row').forEach(row => {
+        const currentStock = parseInt(row.querySelector('[data-current]').dataset.current);
+        
+        if (currentStock < 10) {
+            const input = row.querySelector('.quantity-input');
+            input.value = Math.max(50, currentStock * 2); // Set to 50 or double current, whichever is higher
+            calculateChange(input);
+        }
+    });
+}
+
+function confirmBulkUpdate() {
+    if (updateCount === 0) {
+        alert('Please specify new quantities for at least one product.');
+        return false;
+    }
+    
+    const reason = document.getElementById('reason').value.trim();
+    if (!reason) {
+        alert('Please provide a reason for this bulk update.');
+        document.getElementById('reason').focus();
+        return false;
+    }
+    
+    return confirm(`Are you sure you want to update ${updateCount} products?\n\nThis will create ${updateCount} transaction records in your audit trail.\n\nReason: "${reason}"\n\nChanges:\n• ${increaseCount} increases\n• ${decreaseCount} decreases\n\nClick OK to proceed.`);
+}
+
+// Initialize summary on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateSummary();
+});
+</script>
+{% endblock %}

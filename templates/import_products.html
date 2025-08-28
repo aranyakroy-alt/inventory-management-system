@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="import-page">
+    <div class="page-header">
+        <h2>Import Products from CSV</h2>
+        <p>Upload a CSV file to add new products or update existing ones</p>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions-section">
+        <div class="instructions-card">
+            <h3>Import Instructions</h3>
+            <div class="instructions-grid">
+                <div class="instruction-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Download Template</h4>
+                        <p>Use our CSV template to ensure proper formatting</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Fill Product Data</h4>
+                        <p>Add your products with required fields: Name, SKU, Price, Quantity</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Upload CSV File</h4>
+                        <p>Select your completed CSV file and upload</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Review Results</h4>
+                        <p>Check the import summary and any error messages</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Format Requirements -->
+    <div class="format-section">
+        <h3>CSV Format Requirements</h3>
+        <div class="format-grid">
+            <div class="required-fields">
+                <h4>Required Fields</h4>
+                <ul class="field-list required">
+                    <li><strong>Name</strong> - Product name (text)</li>
+                    <li><strong>SKU</strong> - Unique product code (text)</li>
+                    <li><strong>Price</strong> - Product price (number, no currency symbol)</li>
+                    <li><strong>Quantity</strong> - Stock quantity (whole number, 0 or positive)</li>
+                </ul>
+            </div>
+            <div class="optional-fields">
+                <h4>Optional Fields</h4>
+                <ul class="field-list optional">
+                    <li><strong>Description</strong> - Product description (text)</li>
+                    <li><strong>Supplier</strong> - Supplier name (text, will create if doesn't exist)</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="import-notes">
+            <h4>Important Notes</h4>
+            <ul>
+                <li><strong>Existing Products:</strong> Products with matching SKUs will be updated</li>
+                <li><strong>New Products:</strong> Products with new SKUs will be created</li>
+                <li><strong>Suppliers:</strong> New suppliers will be created automatically if they don't exist</li>
+                <li><strong>Transactions:</strong> Stock changes will create transaction records</li>
+                <li><strong>Validation:</strong> Negative prices and quantities are not allowed</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Template Download -->
+    <div class="template-section">
+        <h3>Download CSV Template</h3>
+        <div class="template-card">
+            <div class="template-info">
+                <h4>Products Import Template</h4>
+                <p>Pre-formatted CSV file with proper headers and example data</p>
+                <ul>
+                    <li>Correct column headers</li>
+                    <li>Sample data for reference</li>
+                    <li>Ready to fill with your products</li>
+                </ul>
+            </div>
+            <div class="template-actions">
+                <a href="{{ url_for('download_template', template_type='products') }}" 
+                   class="btn btn-secondary template-btn">
+                    Download Template
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Upload -->
+    <div class="upload-section">
+        <h3>Upload Your CSV File</h3>
+        <form method="POST" enctype="multipart/form-data" class="upload-form" onsubmit="return validateUpload()">
+            <div class="upload-area">
+                <div class="upload-box">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">
+                        <h4>Select CSV File</h4>
+                        <p>Choose your products CSV file to upload</p>
+                    </div>
+                    <input type="file" 
+                           name="csv_file" 
+                           id="csv_file" 
+                           accept=".csv" 
+                           required 
+                           class="file-input"
+                           onchange="showFileName(this)">
+                </div>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-actions">
+                        <button type="button" class="btn btn-small btn-secondary" onclick="clearFile()">
+                            Change File
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="upload-controls">
+                <button type="submit" class="btn btn-primary upload-btn" id="uploadBtn" disabled>
+                    Import Products
+                </button>
+                <a href="{{ url_for('import_export') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning-section">
+        <div class="warning-card">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-content">
+                <h4>Before You Import</h4>
+                <ul>
+                    <li><strong>Backup Recommended:</strong> Consider exporting your current data first</li>
+                    <li><strong>Test with Small File:</strong> Try importing a few products first</li>
+                    <li><strong>Check SKUs:</strong> Ensure SKUs are unique and correct</li>
+                    <li><strong>Review Data:</strong> Double-check prices and quantities</li>
+                    <li><strong>Transaction Logging:</strong> All changes will be recorded in transaction history</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.import-page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: white;
+    border-radius: 12px;
+}
+
+.page-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2rem;
+}
+
+.page-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+/* Instructions */
+.instructions-section,
+.format-section,
+.template-section,
+.upload-section,
+.warning-section {
+    margin-bottom: 2rem;
+}
+
+.instructions-card,
+.upload-form,
+.warning-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.instructions-card h3,
+.format-section h3,
+.template-section h3,
+.upload-section h3 {
+    color: #2c3e50;
+    margin: 0 0 1.5rem 0;
+    text-align: center;
+}
+
+.instructions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.instruction-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+}
+
+.step-number {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #27ae60;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.step-content h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+}
+
+.step-content p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* Format Section */
+.format-section {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 12px;
+}
+
+.format-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.required-fields,
+.optional-fields {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.required-fields h4 {
+    color: #e74c3c;
+    margin: 0 0 1rem 0;
+}
+
+.optional-fields h4 {
+    color: #3498db;
+    margin: 0 0 1rem 0;
+}
+
+.field-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.field-list li {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.field-list.required li {
+    background: #fff5f5;
+    border-left: 3px solid #e74c3c;
+}
+
+.field-list.optional li {
+    background: #f0f8ff;
+    border-left: 3px solid #3498db;
+}
+
+.import-notes {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.import-notes h4 {
+    color: #2c3e50;
+    margin: 0 0 1rem 0;
+}
+
+.import-notes ul {
+    margin: 0;
+    color: #7f8c8d;
+}
+
+.import-notes li {
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+/* Template Section */
+.template-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.template-info {
+    flex: 1;
+}
+
+.template-info h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+}
+
+.template-info p {
+    color: #7f8c8d;
+    margin: 0 0 1rem 0;
+}
+
+.template-info ul {
+    margin: 0;
+    color: #7f8c8d;
+}
+
+.template-actions {
+    text-align: center;
+}
+
+.template-btn {
+    padding: 1rem 2rem;
+    font-weight: 500;
+    border-radius: 8px;
+}
+
+/* Upload Section */
+.upload-area {
+    margin-bottom: 2rem;
+}
+
+.upload-box {
+    border: 2px dashed #bdc3c7;
+    border-radius: 12px;
+    padding: 3rem;
+    text-align: center;
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+}
+
+.upload-box:hover {
+    border-color: #27ae60;
+    background-color: #f8fff8;
+}
+
+.upload-box.has-file {
+    border-color: #27ae60;
+    background-color: #f0fff4;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+}
+
+.upload-text h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+}
+
+.upload-text p {
+    color: #7f8c8d;
+    margin: 0;
+}
+
+.file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.file-info {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f0fff4;
+    border-radius: 8px;
+    border: 1px solid #27ae60;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.upload-controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.upload-btn {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.upload-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Warning */
+.warning-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+}
+
+.warning-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.warning-content h4 {
+    color: #856404;
+    margin: 0 0 1rem 0;
+}
+
+.warning-content ul {
+    margin: 0;
+    color: #856404;
+}
+
+.warning-content li {
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .format-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .template-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .instructions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .upload-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+</style>
+
+<script>
+function showFileName(input) {
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const uploadBox = document.querySelector('.upload-box');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    if (input.files && input.files[0]) {
+        fileName.textContent = input.files[0].name;
+        fileInfo.style.display = 'block';
+        uploadBox.style.display = 'none';
+        uploadBox.classList.add('has-file');
+        uploadBtn.disabled = false;
+    }
+}
+
+function clearFile() {
+    const fileInput = document.getElementById('csv_file');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadBox = document.querySelector('.upload-box');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    fileInput.value = '';
+    fileInfo.style.display = 'none';
+    uploadBox.style.display = 'block';
+    uploadBox.classList.remove('has-file');
+    uploadBtn.disabled = true;
+}
+
+function validateUpload() {
+    const fileInput = document.getElementById('csv_file');
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('Please select a CSV file to upload.');
+        return false;
+    }
+    
+    const file = fileInput.files[0];
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('Please select a CSV file (.csv extension).');
+        return false;
+    }
+    
+    return confirm('Are you sure you want to import products from this CSV file?\n\n' +
+                  'This will:\n' +
+                  '• Create new products for new SKUs\n' +
+                  '• Update existing products with matching SKUs\n' +
+                  '• Create transaction records for all changes\n' +
+                  '• Create new suppliers if they don\'t exist\n\n' +
+                  'Click OK to proceed with the import.');
+}
+
+// Enable drag and drop
+const uploadBox = document.querySelector('.upload-box');
+const fileInput = document.getElementById('csv_file');
+
+uploadBox.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    this.classList.add('drag-over');
+});
+
+uploadBox.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+});
+
+uploadBox.addEventListener('drop', function(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        fileInput.files = e.dataTransfer.files;
+        showFileName(fileInput);
+    }
+});
+</script>
+{% endblock %}
