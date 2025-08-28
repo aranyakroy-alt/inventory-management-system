@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 import os
-from models import db, Product, Supplier, StockTransaction
+from models import db, Product, Supplier, StockTransaction, ReorderPoint
 
 def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
     """
@@ -526,6 +526,140 @@ def product_history(id):
                          product=product, 
                          transactions=transactions,
                          stats=stats)
+
+@app.route('/alerts')
+def alerts():
+    """Low stock alerts dashboard"""
+    # Get all active reorder points with their products
+    alerts_query = db.session.query(ReorderPoint, Product).join(Product).filter(
+        ReorderPoint.is_active == True
+    ).order_by(Product.quantity.asc())
+    
+    # Categorize alerts by severity
+    critical_alerts = []  # Out of stock
+    urgent_alerts = []    # Less than 50% of minimum
+    warning_alerts = []   # Below minimum but not critical
+    ok_products = []      # Above minimum
+    
+    total_alerts = 0
+    
+    for reorder_point, product in alerts_query:
+        alert_level = reorder_point.alert_level
+        alert_data = {
+            'product': product,
+            'reorder_point': reorder_point,
+            'alert_level': alert_level,
+            'suggested_order': reorder_point.suggested_order_amount
+        }
+        
+        if alert_level == 'critical':
+            critical_alerts.append(alert_data)
+            total_alerts += 1
+        elif alert_level == 'urgent':
+            urgent_alerts.append(alert_data)
+            total_alerts += 1
+        elif alert_level == 'warning':
+            warning_alerts.append(alert_data)
+            total_alerts += 1
+        else:
+            ok_products.append(alert_data)
+    
+    return render_template('alerts.html',
+                         critical_alerts=critical_alerts,
+                         urgent_alerts=urgent_alerts,
+                         warning_alerts=warning_alerts,
+                         ok_products=ok_products[:10],  # Show only first 10 OK products
+                         total_alerts=total_alerts)
+
+@app.route('/reorder_points')
+def reorder_points():
+    """Manage reorder point configurations"""
+    # Get all products with their reorder points
+    products = db.session.query(Product).outerjoin(ReorderPoint).all()
+    
+    return render_template('reorder_points.html', products=products)
+
+@app.route('/reorder_points/<int:product_id>', methods=['GET', 'POST'])
+def manage_reorder_point(product_id):
+    """Configure reorder point for a specific product"""
+    product = Product.query.get_or_404(product_id)
+    reorder_point = ReorderPoint.query.filter_by(product_id=product_id).first()
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            minimum_quantity = int(request.form['minimum_quantity'])
+            reorder_quantity = int(request.form['reorder_quantity'])
+            is_active = 'is_active' in request.form
+            
+            # Validate input
+            if minimum_quantity < 0:
+                flash('Minimum quantity cannot be negative', 'error')
+                return render_template('manage_reorder_point.html', product=product, reorder_point=reorder_point)
+            
+            if reorder_quantity <= minimum_quantity:
+                flash('Reorder quantity should be greater than minimum quantity', 'error')
+                return render_template('manage_reorder_point.html', product=product, reorder_point=reorder_point)
+            
+            # Create or update reorder point
+            if reorder_point:
+                # Update existing
+                reorder_point.minimum_quantity = minimum_quantity
+                reorder_point.reorder_quantity = reorder_quantity
+                reorder_point.is_active = is_active
+                reorder_point.updated_at = db.func.now()
+            else:
+                # Create new
+                reorder_point = ReorderPoint(
+                    product_id=product_id,
+                    minimum_quantity=minimum_quantity,
+                    reorder_quantity=reorder_quantity,
+                    is_active=is_active
+                )
+                db.session.add(reorder_point)
+            
+            db.session.commit()
+            
+            status = "active" if is_active else "inactive"
+            flash(f'Reorder point for "{product.name}" updated successfully (minimum: {minimum_quantity}, reorder: {reorder_quantity}, {status})', 'success')
+            
+            # Redirect back to reorder points list
+            return redirect(url_for('reorder_points'))
+            
+        except ValueError:
+            flash('Please enter valid numbers for quantities', 'error')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating reorder point: {str(e)}', 'error')
+    
+    return render_template('manage_reorder_point.html', product=product, reorder_point=reorder_point)
+
+@app.route('/quick_reorder/<int:product_id>')
+def quick_reorder(product_id):
+    """Quick action to generate reorder suggestion for a product"""
+    product = Product.query.get_or_404(product_id)
+    reorder_point = ReorderPoint.query.filter_by(product_id=product_id).first()
+    
+    if not reorder_point or not reorder_point.is_active:
+        flash(f'No active reorder configuration found for "{product.name}"', 'error')
+        return redirect(url_for('alerts'))
+    
+    # Calculate reorder information
+    current_stock = product.quantity
+    minimum_needed = reorder_point.minimum_quantity
+    suggested_order = reorder_point.suggested_order_amount
+    total_after_order = current_stock + suggested_order
+    
+    # Create detailed reorder message
+    supplier_info = f" from {product.supplier.name}" if product.supplier else ""
+    
+    flash(f'''Reorder suggestion for "{product.name}":
+          • Current stock: {current_stock} units
+          • Minimum threshold: {minimum_needed} units  
+          • Suggested order: {suggested_order} units{supplier_info}
+          • Stock after order: {total_after_order} units''', 'success')
+    
+    return redirect(url_for('alerts'))
 
 # Run the application
 if __name__ == '__main__':

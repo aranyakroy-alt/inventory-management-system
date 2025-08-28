@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="form-container">
+    <h2>Configure Reorder Point</h2>
+    <p>Set up automated low stock alerts for "{{ product.name }}" ({{ product.sku }})</p>
+    
+    <div class="product-context">
+        <div class="context-grid">
+            <div class="context-item">
+                <label>Current Stock Level</label>
+                <span class="value">{{ product.quantity }} units</span>
+            </div>
+            <div class="context-item">
+                <label>Product Price</label>
+                <span class="value">${{ "%.2f"|format(product.price) }}</span>
+            </div>
+            {% if product.supplier %}
+            <div class="context-item">
+                <label>Supplier</label>
+                <span class="value">{{ product.supplier.name }}</span>
+            </div>
+            {% endif %}
+            {% if reorder_point %}
+            <div class="context-item">
+                <label>Current Alert Status</label>
+                <span class="value">
+                    {% if reorder_point.is_active %}
+                        {% set alert_level = reorder_point.alert_level %}
+                        {% if alert_level == 'critical' %}
+                            <span class="status-critical">Critical - Out of Stock</span>
+                        {% elif alert_level == 'urgent' %}
+                            <span class="status-urgent">Urgent - Very Low</span>
+                        {% elif alert_level == 'warning' %}
+                            <span class="status-warning">Warning - Below Minimum</span>
+                        {% else %}
+                            <span class="status-ok">Good - Above Minimum</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="status-inactive">Alerts Disabled</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="POST" class="reorder-form">
+        <div class="form-section">
+            <h3>Alert Thresholds</h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="minimum_quantity">Minimum Stock Level *</label>
+                    <input type="number" 
+                           id="minimum_quantity" 
+                           name="minimum_quantity" 
+                           min="0" 
+                           required
+                           value="{{ reorder_point.minimum_quantity if reorder_point else 10 }}"
+                           placeholder="10">
+                    <small class="help-text">Alert when stock falls below this level</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="reorder_quantity">Target Reorder Level *</label>
+                    <input type="number" 
+                           id="reorder_quantity" 
+                           name="reorder_quantity" 
+                           min="1" 
+                           required
+                           value="{{ reorder_point.reorder_quantity if reorder_point else 50 }}"
+                           placeholder="50">
+                    <small class="help-text">Suggested stock level after reordering</small>
+                </div>
+            </div>
+            
+            <div class="calculation-preview">
+                <h4>Preview Calculation:</h4>
+                <div class="preview-content">
+                    <p><strong>If current stock is <span id="preview-current">{{ product.quantity }}</span>:</strong></p>
+                    <ul>
+                        <li>Alert triggers when below <span id="preview-minimum">{{ reorder_point.minimum_quantity if reorder_point else 10 }}</span> units</li>
+                        <li>Suggested order quantity: <span id="preview-order">{{ (reorder_point.reorder_quantity - product.quantity) if reorder_point and (reorder_point.reorder_quantity - product.quantity) > 0 else 0 }}</span> units</li>
+                        <li>Stock after order: <span id="preview-after">{{ reorder_point.reorder_quantity if reorder_point else 50 }}</span> units</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <h3>Alert Settings</h3>
+            
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" 
+                           id="is_active" 
+                           name="is_active" 
+                           {% if not reorder_point or reorder_point.is_active %}checked{% endif %}>
+                    <label for="is_active">Enable low stock alerts for this product</label>
+                </div>
+                <small class="help-text">Uncheck to disable alerts without losing your configuration</small>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
+            <a href="{{ url_for('reorder_points') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+    
+    {% if reorder_point %}
+        <div class="configuration-info">
+            <h4>Configuration History</h4>
+            <p><small>
+                Created: {{ reorder_point.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                {% if reorder_point.updated_at != reorder_point.created_at %}
+                    <br>Last updated: {{ reorder_point.updated_at.strftime('%B %d, %Y at %I:%M %p') }}
+                {% endif %}
+            </small></p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.product-context {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+    border-left: 4px solid #3498db;
+}
+
+.context-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.context-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.context-item label {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    font-weight: 500;
+}
+
+.context-item .value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.status-critical { color: #c53030; }
+.status-urgent { color: #e53e3e; }
+.status-warning { color: #d69e2e; }
+.status-ok { color: #38a169; }
+.status-inactive { color: #718096; }
+
+.reorder-form {
+    max-width: 700px;
+}
+
+.form-section {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-section h3 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+}
+
+.help-text {
+    color: #7f8c8d;
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+.calculation-preview {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.calculation-preview h4 {
+    margin: 0 0 0.75rem 0;
+    color: #4a5568;
+    font-size: 1rem;
+}
+
+.preview-content p {
+    margin: 0 0 0.5rem 0;
+}
+
+.preview-content ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.preview-content li {
+    margin-bottom: 0.25rem;
+}
+
+#preview-minimum,
+#preview-order,
+#preview-after {
+    font-weight: bold;
+    color: #3498db;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.checkbox-group label {
+    margin: 0;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.configuration-info {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.configuration-info h4 {
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .context-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        flex-direction: column;
+    }
+}
+</style>
+
+<script>
+// Update preview calculations when values change
+document.addEventListener('DOMContentLoaded', function() {
+    const minimumInput = document.getElementById('minimum_quantity');
+    const reorderInput = document.getElementById('reorder_quantity');
+    const currentStock = {{ product.quantity }};
+    
+    function updatePreview() {
+        const minimum = parseInt(minimumInput.value) || 0;
+        const reorder = parseInt(reorderInput.value) || 0;
+        
+        document.getElementById('preview-minimum').textContent = minimum;
+        
+        const orderQuantity = Math.max(0, reorder - currentStock);
+        document.getElementById('preview-order').textContent = orderQuantity;
+        
+        document.getElementById('preview-after').textContent = reorder;
+    }
+    
+    minimumInput.addEventListener('input', updatePreview);
+    reorderInput.addEventListener('input', updatePreview);
+});
+</script>
+{% endblock %}

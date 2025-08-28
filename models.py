@@ -85,3 +85,60 @@ class StockTransaction(db.Model):
     def is_decrease(self):
         """True if this transaction decreased stock"""
         return self.quantity_change < 0
+    
+class ReorderPoint(db.Model):
+    """
+    Phase 4: Configure automated reorder alerts for products
+    
+    This model allows setting custom reorder thresholds for each product:
+    - When stock falls below minimum_quantity, trigger low stock alerts
+    - Suggest reordering reorder_quantity units
+    - Can be enabled/disabled per product
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Link to the product
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False, unique=True)
+    
+    # Reorder configuration
+    minimum_quantity = db.Column(db.Integer, default=10, nullable=False)     # Alert when stock drops below this
+    reorder_quantity = db.Column(db.Integer, default=50, nullable=False)     # Suggested reorder amount
+    is_active = db.Column(db.Boolean, default=True, nullable=False)          # Enable/disable alerts for this product
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship back to product
+    product = db.relationship('Product', backref=db.backref('reorder_point', uselist=False))
+    
+    def __repr__(self):
+        return f'<ReorderPoint {self.product.name}: min={self.minimum_quantity}, reorder={self.reorder_quantity}>'
+    
+    @property
+    def is_below_minimum(self):
+        """Check if the product is currently below the reorder threshold"""
+        return self.is_active and self.product.quantity < self.minimum_quantity
+    
+    @property
+    def alert_level(self):
+        """Return alert severity level based on current stock"""
+        if not self.is_active:
+            return 'disabled'
+        
+        current = self.product.quantity
+        if current == 0:
+            return 'critical'  # Out of stock
+        elif current < self.minimum_quantity * 0.5:
+            return 'urgent'    # Less than half the minimum
+        elif current < self.minimum_quantity:
+            return 'warning'   # Below minimum but not critical
+        else:
+            return 'ok'        # Above minimum
+    
+    @property
+    def suggested_order_amount(self):
+        """Calculate suggested order quantity to reach reorder level"""
+        current = self.product.quantity
+        needed_to_reach_reorder = self.reorder_quantity - current
+        return max(needed_to_reach_reorder, 0)
