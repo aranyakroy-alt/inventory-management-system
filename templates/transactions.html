@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="products-container">
+    <div class="products-header">
+        <h2>Stock Transaction History</h2>
+        <div class="products-controls">
+            <!-- Filter Form -->
+            <form method="GET" class="search-form">
+                <div class="filter-section">
+                    <span class="filter-label">Filter transactions:</span>
+                    
+                    <div class="filter-row">
+                        <div class="form-group">
+                            <select name="product_id" class="form-control">
+                                <option value="">All Products</option>
+                                {% for product in products %}
+                                    <option value="{{ product.id }}" 
+                                            {% if selected_product == product.id|string %}selected{% endif %}>
+                                        {{ product.name }} ({{ product.sku }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <select name="type" class="form-control">
+                                <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Types</option>
+                                <option value="manual_adjustment" {% if selected_type == 'manual_adjustment' %}selected{% endif %}>Manual Adjustments</option>
+                                <option value="sale" {% if selected_type == 'sale' %}selected{% endif %}>Sales</option>
+                                <option value="purchase" {% if selected_type == 'purchase' %}selected{% endif %}>Purchases</option>
+                                <option value="return" {% if selected_type == 'return' %}selected{% endif %}>Returns</option>
+                                <option value="correction" {% if selected_type == 'correction' %}selected{% endif %}>Corrections</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-search">Filter</button>
+                        
+                        {% if selected_product or selected_type != 'all' %}
+                            <a href="{{ url_for('transactions') }}" class="btn btn-clear">Clear Filters</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+            
+            <div class="products-summary">
+                <span class="product-count">{{ transactions|length }} transactions</span>
+                {% if transactions|length == 100 %}
+                    <small class="text-muted">(Showing most recent 100)</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if transactions %}
+        <div class="table-container">
+            <table class="products-table">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Product</th>
+                        <th>Change</th>
+                        <th>Before → After</th>
+                        <th>Type</th>
+                        <th>Reason</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td class="transaction-date">
+                            <strong>{{ transaction.created_at.strftime('%m/%d/%Y') }}</strong>
+                            <br>
+                            <small>{{ transaction.created_at.strftime('%I:%M %p') }}</small>
+                        </td>
+                        <td class="product-name">
+                            <strong>{{ transaction.product.name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ transaction.product.sku }}</small>
+                        </td>
+                        <td class="quantity-change">
+                            {% if transaction.is_increase %}
+                                <span class="change-increase">+{{ transaction.quantity_change }}</span>
+                            {% else %}
+                                <span class="change-decrease">{{ transaction.quantity_change }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="quantity-flow">
+                            <span class="quantity-before">{{ transaction.quantity_before }}</span>
+                            <span class="arrow">→</span>
+                            <span class="quantity-after">{{ transaction.quantity_after }}</span>
+                        </td>
+                        <td class="transaction-type">
+                            <span class="type-badge type-{{ transaction.transaction_type }}">
+                                {{ transaction.transaction_type.replace('_', ' ').title() }}
+                            </span>
+                        </td>
+                        <td class="reason">{{ transaction.reason or 'No reason provided' }}</td>
+                        <td class="notes">
+                            {% if transaction.user_notes %}
+                                <details>
+                                    <summary>View Notes</summary>
+                                    <p>{{ transaction.user_notes }}</p>
+                                </details>
+                            {% else %}
+                                <small class="text-muted">No notes</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No Transactions Found</h3>
+            {% if selected_product or selected_type != 'all' %}
+                <p>No transactions match your current filters.</p>
+                <a href="{{ url_for('transactions') }}" class="btn btn-secondary">Clear Filters</a>
+            {% else %}
+                <p>No stock transactions have been recorded yet.</p>
+                <p>Transactions will appear here when you adjust product stock levels.</p>
+                <a href="{{ url_for('products') }}" class="btn btn-primary">Manage Products</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.filter-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-row .form-group {
+    margin-bottom: 0;
+    min-width: 200px;
+}
+
+.transaction-date {
+    min-width: 120px;
+    font-size: 0.9rem;
+}
+
+.quantity-change {
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.change-increase {
+    color: #27ae60;
+}
+
+.change-decrease {
+    color: #e74c3c;
+}
+
+.quantity-flow {
+    text-align: center;
+    font-family: monospace;
+}
+
+.quantity-before,
+.quantity-after {
+    font-weight: bold;
+}
+
+.arrow {
+    color: #7f8c8d;
+    margin: 0 0.5rem;
+}
+
+.type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.type-manual_adjustment {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.type-sale {
+    background-color: #ffebee;
+    color: #d32f2f;
+}
+
+.type-purchase {
+    background-color: #e8f5e8;
+    color: #388e3c;
+}
+
+.type-return {
+    background-color: #fff3e0;
+    color: #f57c00;
+}
+
+.type-correction {
+    background-color: #f3e5f5;
+    color: #7b1fa2;
+}
+
+details summary {
+    cursor: pointer;
+    color: #3498db;
+    font-size: 0.9rem;
+}
+
+details p {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+    .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-row .form-group {
+        min-width: auto;
+    }
+}
+</style>
+{% endblock %}

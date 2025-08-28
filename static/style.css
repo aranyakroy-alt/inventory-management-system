@@ -782,3 +782,16 @@ body {
 .supplier small {
     color: #7f8c8d;
 }
+
+.btn-bulk {
+    background-color: #9b59b6;
+    color: white;
+    width: 28px;
+    height: 28px;
+    margin-left: 0.25rem;
+}
+
+.btn-bulk:hover {
+    background-color: #8e44ad;
+    transform: scale(1.1);
+}

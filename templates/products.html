@@ -88,6 +88,8 @@
                                             title="Decrease by 1" {% if product.quantity == 0 %}disabled{% endif %}>−</button>
                                     <button class="btn btn-stock btn-increase" onclick="adjustStock({{ product.id }}, 'increase', '{{ product.name }}')" 
                                             title="Increase by 1">+</button>
+                                    <button class="btn btn-stock btn-bulk" onclick="bulkAdjustStock({{ product.id }}, '{{ product.name }}', {{ product.quantity }})" 
+                                            title="Bulk adjustment">⚡</button>        
                                 </div>
                             </div>
                         </td>

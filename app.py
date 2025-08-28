@@ -1,6 +1,45 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-from models import db, Product, Supplier
 import os
+from models import db, Product, Supplier, StockTransaction
+
+def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
+    """
+    Helper function to log stock transactions consistently
+    
+    Args:
+        product: Product object being changed
+        quantity_change: Integer change in stock (positive or negative)
+        transaction_type: String describing the type of transaction
+        reason: Short description of why the change was made
+        user_notes: Optional detailed notes
+    
+    Returns:
+        StockTransaction object that was created
+    """
+    # Capture the before state
+    quantity_before = product.quantity
+    
+    # Apply the change
+    product.quantity += quantity_change
+    
+    # Capture the after state
+    quantity_after = product.quantity
+    
+    # Create the transaction record
+    transaction = StockTransaction(
+        product_id=product.id,
+        transaction_type=transaction_type,
+        quantity_change=quantity_change,
+        quantity_before=quantity_before,
+        quantity_after=quantity_after,
+        reason=reason,
+        user_notes=user_notes
+    )
+    
+    # Add transaction to database session (will be committed with product)
+    db.session.add(transaction)
+    
+    return transaction
 
 # Create Flask application
 app = Flask(__name__)
@@ -97,7 +136,7 @@ def add_product():
 
 @app.route('/edit_product/<int:id>', methods=['GET', 'POST'])
 def edit_product(id):
-    """Edit an existing product"""
+    """Edit an existing product with transaction logging for quantity changes"""
     # Find the product or return 404 if not found
     product = Product.query.get_or_404(id)
     
@@ -108,7 +147,7 @@ def edit_product(id):
             sku = request.form['sku']
             description = request.form['description']
             price = float(request.form['price'])
-            quantity = int(request.form['quantity'])
+            new_quantity = int(request.form['quantity'])  # New quantity from form
             supplier_id = request.form.get('supplier_id')
             
             # Convert empty string to None for supplier_id
@@ -124,23 +163,60 @@ def edit_product(id):
                 suppliers = Supplier.query.all()
                 return render_template('edit_product.html', product=product, suppliers=suppliers)
             
-            # Update the product
+            # TRANSACTION LOGGING: Check if quantity changed
+            old_quantity = product.quantity
+            quantity_changed = new_quantity != old_quantity
+            
+            if quantity_changed:
+                # Calculate the change
+                quantity_change = new_quantity - old_quantity
+                
+                # Validate the new quantity
+                if new_quantity < 0:
+                    flash(f'Cannot set quantity to {new_quantity} (cannot be negative)', 'error')
+                    suppliers = Supplier.query.all()
+                    return render_template('edit_product.html', product=product, suppliers=suppliers)
+                
+                # Create transaction record BEFORE updating the product
+                transaction = StockTransaction(
+                    product_id=product.id,
+                    transaction_type='edit_adjustment',
+                    quantity_change=quantity_change,
+                    quantity_before=old_quantity,
+                    quantity_after=new_quantity,
+                    reason=f'Quantity changed via product edit ({old_quantity} → {new_quantity})',
+                    user_notes=f'Product "{name}" quantity updated during edit operation'
+                )
+                
+                # Add transaction to session
+                db.session.add(transaction)
+            
+            # Update the product (including quantity)
             product.name = name
             product.sku = sku
             product.description = description
             product.price = price
-            product.quantity = quantity
+            product.quantity = new_quantity  # Set the new quantity
             product.supplier_id = supplier_id
             
-            # Save to database
+            # Save to database (commits both product and transaction if any)
             db.session.commit()
             
-            flash(f'Product "{name}" updated successfully!', 'success')
+            # Create appropriate success message
+            if quantity_changed:
+                if quantity_change > 0:
+                    flash(f'Product "{name}" updated successfully! Stock increased by {quantity_change} (was {old_quantity}, now {new_quantity})', 'success')
+                else:
+                    flash(f'Product "{name}" updated successfully! Stock decreased by {abs(quantity_change)} (was {old_quantity}, now {new_quantity})', 'success')
+            else:
+                flash(f'Product "{name}" updated successfully!', 'success')
+            
             return redirect(url_for('products'))
             
         except ValueError:
             flash('Please enter valid numbers for price and quantity.', 'error')
         except Exception as e:
+            db.session.rollback()  # Rollback in case of error
             flash(f'Error updating product: {str(e)}', 'error')
     
     # GET request - show the edit form with current data and suppliers list
@@ -168,7 +244,7 @@ def delete_product(id):
 
 @app.route('/adjust_stock/<int:id>/<action>')
 def adjust_stock(id, action):
-    """Adjust product stock quantity"""
+    """Adjust product stock quantity with transaction logging"""
     try:
         # Find the product or return 404 if not found
         product = Product.query.get_or_404(id)
@@ -177,35 +253,55 @@ def adjust_stock(id, action):
         product_name = product.name
         old_quantity = product.quantity
         
-        # Perform stock adjustment
+        # Determine the change and reason based on action
         if action == 'increase':
-            product.quantity += 1
-            new_quantity = product.quantity
-            flash(f'✅ Added 1 to "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
-            
+            if product.quantity + 1 >= 0:  # Safety check
+                transaction = log_stock_transaction(
+                    product=product,
+                    quantity_change=1,
+                    transaction_type='manual_adjustment',
+                    reason='Manual increase (+1)',
+                    user_notes=f'Stock increased via quick adjustment button'
+                )
+                
+                # Commit both product update and transaction
+                db.session.commit()
+                
+                flash(f'Added 1 to "{product_name}" stock (was {old_quantity}, now {product.quantity})', 'success')
+            else:
+                flash(f'Cannot increase "{product_name}" stock - calculation error', 'error')
+                return redirect(url_for('products'))
+                
         elif action == 'decrease':
             if product.quantity > 0:
-                product.quantity -= 1
-                new_quantity = product.quantity
-                flash(f'➖ Removed 1 from "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+                transaction = log_stock_transaction(
+                    product=product,
+                    quantity_change=-1,
+                    transaction_type='manual_adjustment',
+                    reason='Manual decrease (-1)',
+                    user_notes=f'Stock decreased via quick adjustment button'
+                )
+                
+                # Commit both product update and transaction
+                db.session.commit()
+                
+                flash(f'Removed 1 from "{product_name}" stock (was {old_quantity}, now {product.quantity})', 'success')
             else:
-                flash(f'❌ Cannot decrease "{product_name}" stock - already at 0', 'error')
+                flash(f'Cannot decrease "{product_name}" stock - already at 0', 'error')
                 return redirect(url_for('products'))
         else:
-            flash('❌ Invalid stock adjustment action', 'error')
+            flash('Invalid stock adjustment action', 'error')
             return redirect(url_for('products'))
         
-        # Save changes to database
-        db.session.commit()
-        
     except Exception as e:
-        flash(f'❌ Error adjusting stock: {str(e)}', 'error')
+        db.session.rollback()  # Rollback in case of error
+        flash(f'Error adjusting stock: {str(e)}', 'error')
     
     return redirect(url_for('products'))
 
 @app.route('/bulk_adjust_stock/<int:id>', methods=['POST'])
 def bulk_adjust_stock(id):
-    """Adjust product stock by custom amount"""
+    """Adjust product stock by custom amount with transaction logging"""
     try:
         # Find the product or return 404 if not found
         product = Product.query.get_or_404(id)
@@ -214,39 +310,52 @@ def bulk_adjust_stock(id):
         adjustment = int(request.form.get('adjustment', 0))
         
         if adjustment == 0:
-            flash('❌ Please enter a valid adjustment amount', 'error')
+            flash('Please enter a valid adjustment amount', 'error')
             return redirect(url_for('products'))
         
-        # Store current values for messages
+        # Store current values for messages and validation
         product_name = product.name
         old_quantity = product.quantity
         new_quantity = old_quantity + adjustment
         
         # Validate new quantity isn't negative
         if new_quantity < 0:
-            flash(f'❌ Cannot adjust "{product_name}" stock to {new_quantity} (would be negative)', 'error')
+            flash(f'Cannot adjust "{product_name}" stock to {new_quantity} (would be negative)', 'error')
             return redirect(url_for('products'))
         
-        # Apply adjustment
-        product.quantity = new_quantity
-        
-        # Create appropriate message
+        # Determine reason and notes based on adjustment type
         if adjustment > 0:
-            flash(f'✅ Added {adjustment} to "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+            reason = f'Bulk increase (+{adjustment})'
+            user_notes = f'Stock increased by {adjustment} units via bulk adjustment'
         else:
-            flash(f'➖ Removed {abs(adjustment)} from "{product_name}" stock (was {old_quantity}, now {new_quantity})', 'success')
+            reason = f'Bulk decrease ({adjustment})'
+            user_notes = f'Stock decreased by {abs(adjustment)} units via bulk adjustment'
         
-        # Save changes to database
+        # Log the transaction (this also applies the change to product.quantity)
+        transaction = log_stock_transaction(
+            product=product,
+            quantity_change=adjustment,
+            transaction_type='manual_adjustment',
+            reason=reason,
+            user_notes=user_notes
+        )
+        
+        # Commit both product update and transaction
         db.session.commit()
         
+        # Create appropriate success message
+        if adjustment > 0:
+            flash(f'Added {adjustment} to "{product_name}" stock (was {old_quantity}, now {product.quantity})', 'success')
+        else:
+            flash(f'Removed {abs(adjustment)} from "{product_name}" stock (was {old_quantity}, now {product.quantity})', 'success')
+        
     except ValueError:
-        flash('❌ Please enter a valid number for stock adjustment', 'error')
+        flash('Please enter a valid number for stock adjustment', 'error')
     except Exception as e:
-        flash(f'❌ Error adjusting stock: {str(e)}', 'error')
+        db.session.rollback()  # Rollback in case of error
+        flash(f'Error adjusting stock: {str(e)}', 'error')
     
     return redirect(url_for('products'))
-
-# Add these routes to your app.py file, before the "if __name__ == '__main__':" line
 
 @app.route('/suppliers')
 def suppliers():
@@ -356,6 +465,67 @@ def delete_supplier(id):
         flash(f'Error deleting supplier: {str(e)}', 'error')
     
     return redirect(url_for('suppliers'))
+
+# ADD these routes to your app.py file before "if __name__ == '__main__':"
+
+@app.route('/transactions')
+def transactions():
+    """Display all stock transactions with filtering options"""
+    # Get filter parameters from URL
+    product_filter = request.args.get('product_id', '')
+    transaction_type = request.args.get('type', 'all')
+    
+    # Start with base query (most recent first)
+    query = StockTransaction.query.order_by(StockTransaction.created_at.desc())
+    
+    # Apply product filter if specified
+    if product_filter and product_filter.isdigit():
+        query = query.filter(StockTransaction.product_id == int(product_filter))
+    
+    # Apply transaction type filter
+    if transaction_type != 'all':
+        query = query.filter(StockTransaction.transaction_type == transaction_type)
+    
+    # Execute query and get results
+    all_transactions = query.limit(100).all()  # Limit to last 100 transactions
+    
+    # Get all products for the filter dropdown
+    all_products = Product.query.order_by(Product.name).all()
+    
+    return render_template('transactions.html', 
+                         transactions=all_transactions, 
+                         products=all_products,
+                         selected_product=product_filter,
+                         selected_type=transaction_type)
+
+@app.route('/product/<int:id>/history')
+def product_history(id):
+    """Display stock transaction history for a specific product"""
+    # Find the product or return 404
+    product = Product.query.get_or_404(id)
+    
+    # Get all transactions for this product (most recent first)
+    transactions = StockTransaction.query.filter_by(product_id=id).order_by(StockTransaction.created_at.desc()).all()
+    
+    # Calculate some basic statistics
+    total_transactions = len(transactions)
+    total_increases = sum(1 for t in transactions if t.is_increase)
+    total_decreases = sum(1 for t in transactions if t.is_decrease)
+    total_quantity_added = sum(t.quantity_change for t in transactions if t.is_increase)
+    total_quantity_removed = abs(sum(t.quantity_change for t in transactions if t.is_decrease))
+    
+    stats = {
+        'total_transactions': total_transactions,
+        'total_increases': total_increases,
+        'total_decreases': total_decreases,
+        'total_quantity_added': total_quantity_added,
+        'total_quantity_removed': total_quantity_removed
+    }
+    
+    return render_template('product_history.html', 
+                         product=product, 
+                         transactions=transactions,
+                         stats=stats)
 
 # Run the application
 if __name__ == '__main__':
