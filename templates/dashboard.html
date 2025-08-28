@@ -1,0 +1,727 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h2>Inventory Analytics Dashboard</h2>
+        <div class="last-updated">
+            <small>Updated: {{ moment().format('MMMM Do YYYY, h:mm a') if moment else 'Just now' }}</small>
+        </div>
+    </div>
+
+    <!-- Key Metrics Overview -->
+    <div class="metrics-grid">
+        <div class="metric-card primary">
+            <div class="metric-icon">📦</div>
+            <div class="metric-content">
+                <div class="metric-number">{{ data.metrics.total_products }}</div>
+                <div class="metric-label">Total Products</div>
+                <div class="metric-detail">
+                    {{ data.metrics.products_with_stock }} in stock, 
+                    {{ data.metrics.out_of_stock_products }} out of stock
+                </div>
+            </div>
+        </div>
+
+        <div class="metric-card success">
+            <div class="metric-icon">💰</div>
+            <div class="metric-content">
+                <div class="metric-number">${{ "{:,.2f}".format(data.metrics.total_inventory_value) }}</div>
+                <div class="metric-label">Inventory Value</div>
+                <div class="metric-detail">Total value of current stock</div>
+            </div>
+        </div>
+
+        <div class="metric-card {% if data.alerts.total_active_alerts > 0 %}warning{% else %}success{% endif %}">
+            <div class="metric-icon">{% if data.alerts.total_active_alerts > 0 %}⚠️{% else %}✅{% endif %}</div>
+            <div class="metric-content">
+                <div class="metric-number">{{ data.alerts.total_active_alerts }}</div>
+                <div class="metric-label">Active Alerts</div>
+                <div class="metric-detail">
+                    {% if data.alerts.total_active_alerts > 0 %}
+                        {{ data.alerts.critical_alerts_count }} critical, 
+                        {{ data.alerts.urgent_alerts_count }} urgent
+                    {% else %}
+                        All products well-stocked
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="metric-card info">
+            <div class="metric-icon">📊</div>
+            <div class="metric-content">
+                <div class="metric-number">{{ data.activity.transactions_last_week }}</div>
+                <div class="metric-label">Transactions (7 days)</div>
+                <div class="metric-detail">
+                    {{ data.activity.increases_last_week }} increases, 
+                    {{ data.activity.decreases_last_week }} decreases
+                </div>
+            </div>
+        </div>
+
+        <div class="metric-card secondary">
+            <div class="metric-icon">🏢</div>
+            <div class="metric-content">
+                <div class="metric-number">{{ data.metrics.total_suppliers }}</div>
+                <div class="metric-label">Suppliers</div>
+                <div class="metric-detail">{{ data.metrics.active_reorder_points }} reorder points configured</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Summary and Quick Actions -->
+    {% if data.alerts.total_active_alerts > 0 %}
+    <div class="dashboard-section">
+        <div class="section-header">
+            <h3>🚨 Active Alerts Summary</h3>
+            <a href="{{ url_for('alerts') }}" class="btn btn-primary">View Full Alert Dashboard</a>
+        </div>
+        <div class="alert-summary">
+            {% if data.alerts.critical_alerts_count > 0 %}
+                <div class="alert-summary-item critical">
+                    <div class="alert-count">{{ data.alerts.critical_alerts_count }}</div>
+                    <div class="alert-text">Critical<br><small>Out of Stock</small></div>
+                </div>
+            {% endif %}
+            {% if data.alerts.urgent_alerts_count > 0 %}
+                <div class="alert-summary-item urgent">
+                    <div class="alert-count">{{ data.alerts.urgent_alerts_count }}</div>
+                    <div class="alert-text">Urgent<br><small>Very Low Stock</small></div>
+                </div>
+            {% endif %}
+            {% if data.alerts.warning_alerts_count > 0 %}
+                <div class="alert-summary-item warning">
+                    <div class="alert-count">{{ data.alerts.warning_alerts_count }}</div>
+                    <div class="alert-text">Warning<br><small>Below Minimum</small></div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Dashboard Content Grid -->
+    <div class="dashboard-grid">
+        <!-- Top Products by Value -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>💎 Top Products by Value</h3>
+            </div>
+            <div class="card-content">
+                {% if data.top_products %}
+                    <div class="ranking-list">
+                        {% for product, value in data.top_products %}
+                            <div class="ranking-item">
+                                <div class="rank-number">{{ loop.index }}</div>
+                                <div class="item-info">
+                                    <div class="item-name">{{ product.name }}</div>
+                                    <div class="item-details">
+                                        {{ product.quantity }} units × ${{ "%.2f"|format(product.price) }}
+                                    </div>
+                                </div>
+                                <div class="item-value">${{ "{:,.2f}".format(value) }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-message">No products with current stock</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Products Requiring Attention -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>⚡ Needs Attention</h3>
+                <small>High-value products with low stock</small>
+            </div>
+            <div class="card-content">
+                {% if data.attention_products %}
+                    <div class="attention-list">
+                        {% for product in data.attention_products %}
+                            <div class="attention-item">
+                                <div class="item-info">
+                                    <div class="item-name">{{ product.name }}</div>
+                                    <div class="item-warning">
+                                        Only {{ product.quantity }} units left
+                                    </div>
+                                </div>
+                                <div class="item-value">${{ "{:,.2f}".format(product.price * product.quantity) }}</div>
+                                <div class="item-actions">
+                                    <a href="{{ url_for('edit_product', id=product.id) }}" 
+                                       class="btn btn-small btn-primary">Restock</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-message">No high-value products need immediate attention</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Top Suppliers -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>🏢 Top Suppliers</h3>
+                <small>By inventory value</small>
+            </div>
+            <div class="card-content">
+                {% if data.top_suppliers %}
+                    <div class="supplier-list">
+                        {% for supplier, product_count, total_stock, total_value in data.top_suppliers %}
+                            <div class="supplier-item">
+                                <div class="supplier-info">
+                                    <div class="supplier-name">{{ supplier.name }}</div>
+                                    <div class="supplier-stats">
+                                        {{ product_count }} products, {{ total_stock or 0 }} total units
+                                    </div>
+                                </div>
+                                <div class="supplier-value">${{ "{:,.2f}".format(total_value or 0) }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-message">No supplier data available</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>🔄 Recent Activity</h3>
+                <a href="{{ url_for('transactions') }}" class="view-all-link">View All</a>
+            </div>
+            <div class="card-content">
+                {% if data.activity.recent_transactions %}
+                    <div class="activity-list">
+                        {% for transaction in data.activity.recent_transactions %}
+                            <div class="activity-item">
+                                <div class="activity-icon {% if transaction.is_increase %}increase{% else %}decrease{% endif %}">
+                                    {% if transaction.is_increase %}+{% else %}-{% endif %}
+                                </div>
+                                <div class="activity-info">
+                                    <div class="activity-product">{{ transaction.product.name }}</div>
+                                    <div class="activity-details">
+                                        {{ transaction.transaction_display }} 
+                                        <span class="activity-time">{{ transaction.created_at.strftime('%m/%d %I:%M%p') }}</span>
+                                    </div>
+                                </div>
+                                <div class="activity-change">
+                                    {{ transaction.quantity_before }} → {{ transaction.quantity_after }}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-message">No recent transactions</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Stock Status Overview -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>📊 Stock Status Overview</h3>
+            </div>
+            <div class="card-content">
+                <div class="stock-overview">
+                    <div class="stock-item in-stock">
+                        <div class="stock-count">{{ data.metrics.products_with_stock }}</div>
+                        <div class="stock-label">In Stock</div>
+                        <div class="stock-bar">
+                            <div class="bar-fill" style="width: {{ (data.metrics.products_with_stock / data.metrics.total_products * 100) if data.metrics.total_products > 0 else 0 }}%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="stock-item low-stock">
+                        <div class="stock-count">{{ data.metrics.low_stock_products }}</div>
+                        <div class="stock-label">Low Stock</div>
+                        <div class="stock-bar">
+                            <div class="bar-fill" style="width: {{ (data.metrics.low_stock_products / data.metrics.total_products * 100) if data.metrics.total_products > 0 else 0 }}%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="stock-item out-of-stock">
+                        <div class="stock-count">{{ data.metrics.out_of_stock_products }}</div>
+                        <div class="stock-label">Out of Stock</div>
+                        <div class="stock-bar">
+                            <div class="bar-fill" style="width: {{ (data.metrics.out_of_stock_products / data.metrics.total_products * 100) if data.metrics.total_products > 0 else 0 }}%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h3>🚀 Quick Actions</h3>
+            </div>
+            <div class="card-content">
+                <div class="quick-actions">
+                    <a href="{{ url_for('add_product') }}" class="action-btn primary">
+                        <div class="action-icon">➕</div>
+                        <div class="action-text">Add Product</div>
+                    </a>
+                    <a href="{{ url_for('products') }}" class="action-btn secondary">
+                        <div class="action-icon">📦</div>
+                        <div class="action-text">Manage Products</div>
+                    </a>
+                    {% if data.alerts.total_active_alerts > 0 %}
+                    <a href="{{ url_for('alerts') }}" class="action-btn warning">
+                        <div class="action-icon">⚠️</div>
+                        <div class="action-text">View Alerts</div>
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('transactions') }}" class="action-btn info">
+                        <div class="action-icon">📊</div>
+                        <div class="action-text">View History</div>
+                    </a>
+                    <a href="{{ url_for('reorder_points') }}" class="action-btn secondary">
+                        <div class="action-icon">⚙️</div>
+                        <div class="action-text">Configure Alerts</div>
+                    </a>
+                    <a href="{{ url_for('suppliers') }}" class="action-btn secondary">
+                        <div class="action-icon">🏢</div>
+                        <div class="action-text">Manage Suppliers</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.dashboard-header h2 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.last-updated {
+    opacity: 0.9;
+}
+
+/* Metrics Grid */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border-left: 4px solid;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+.metric-card.primary { border-left-color: #3498db; }
+.metric-card.success { border-left-color: #2ecc71; }
+.metric-card.warning { border-left-color: #f39c12; }
+.metric-card.info { border-left-color: #9b59b6; }
+.metric-card.secondary { border-left-color: #95a5a6; }
+
+.metric-icon {
+    font-size: 2.5rem;
+    opacity: 0.8;
+}
+
+.metric-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    line-height: 1;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0.25rem 0;
+}
+
+.metric-detail {
+    font-size: 0.8rem;
+    color: #95a5a6;
+    line-height: 1.3;
+}
+
+/* Dashboard Sections */
+.dashboard-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+/* Alert Summary */
+.alert-summary {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.alert-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    min-width: 120px;
+}
+
+.alert-summary-item.critical { background-color: #fed7d7; }
+.alert-summary-item.urgent { background-color: #fed7d7; }
+.alert-summary-item.warning { background-color: #fefcbf; }
+
+.alert-count {
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.alert-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Dashboard Grid */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+.card-header {
+    padding: 1.25rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.view-all-link {
+    color: #3498db;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.card-content {
+    padding: 1.25rem;
+}
+
+/* Ranking Lists */
+.ranking-list,
+.attention-list,
+.supplier-list,
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ranking-item,
+.attention-item,
+.supplier-item,
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.rank-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #3498db;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.item-info,
+.supplier-info,
+.activity-info {
+    flex: 1;
+}
+
+.item-name,
+.supplier-name,
+.activity-product {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.item-details,
+.supplier-stats,
+.activity-details {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+}
+
+.item-value,
+.supplier-value {
+    font-weight: bold;
+    color: #27ae60;
+}
+
+.activity-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    flex-shrink: 0;
+}
+
+.activity-icon.increase { background: #27ae60; }
+.activity-icon.decrease { background: #e74c3c; }
+
+.activity-change {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.activity-time {
+    color: #bdc3c7;
+    font-size: 0.8rem;
+}
+
+/* Stock Overview */
+.stock-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.stock-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stock-count {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.stock-item.in-stock .stock-count { color: #27ae60; }
+.stock-item.low-stock .stock-count { color: #f39c12; }
+.stock-item.out-of-stock .stock-count { color: #e74c3c; }
+
+.stock-label {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    margin-bottom: 0.25rem;
+}
+
+.stock-bar {
+    height: 6px;
+    background: #ecf0f1;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.stock-item.in-stock .bar-fill { background: #27ae60; }
+.stock-item.low-stock .bar-fill { background: #f39c12; }
+.stock-item.out-of-stock .bar-fill { background: #e74c3c; }
+
+/* Quick Actions */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid transparent;
+}
+
+.action-btn:hover {
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+
+.action-btn.primary {
+    background: #3498db;
+    color: white;
+}
+
+.action-btn.primary:hover {
+    background: #2980b9;
+    color: white;
+}
+
+.action-btn.secondary {
+    background: #ecf0f1;
+    color: #2c3e50;
+}
+
+.action-btn.secondary:hover {
+    background: #d5dbdb;
+    color: #2c3e50;
+}
+
+.action-btn.warning {
+    background: #f39c12;
+    color: white;
+}
+
+.action-btn.warning:hover {
+    background: #e67e22;
+    color: white;
+}
+
+.action-btn.info {
+    background: #9b59b6;
+    color: white;
+}
+
+.action-btn.info:hover {
+    background: #8e44ad;
+    color: white;
+}
+
+.action-icon {
+    font-size: 1.5rem;
+}
+
+.action-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.empty-message {
+    text-align: center;
+    color: #95a5a6;
+    font-style: italic;
+    padding: 2rem;
+}
+
+.item-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .metric-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .alert-summary {
+        justify-content: center;
+    }
+    
+    .quick-actions {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+{% endblock %}

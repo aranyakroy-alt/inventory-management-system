@@ -661,6 +661,124 @@ def quick_reorder(product_id):
     
     return redirect(url_for('alerts'))
 
+@app.route('/dashboard')
+def dashboard():
+    """Analytics dashboard with key inventory metrics and insights"""
+    
+    # Basic inventory metrics
+    total_products = Product.query.count()
+    total_suppliers = Supplier.query.count()
+    total_transactions = StockTransaction.query.count()
+    
+    # Stock status analysis
+    products_with_stock = Product.query.filter(Product.quantity > 0).count()
+    out_of_stock_products = Product.query.filter(Product.quantity == 0).count()
+    low_stock_products = Product.query.filter(Product.quantity > 0, Product.quantity < 10).count()
+    
+    # Calculate total inventory value
+    inventory_value_query = db.session.query(db.func.sum(Product.price * Product.quantity)).scalar()
+    total_inventory_value = inventory_value_query if inventory_value_query else 0.0
+    
+    # Alert analysis (if reorder points exist)
+    active_reorder_points = ReorderPoint.query.filter(ReorderPoint.is_active == True).count()
+    
+    # Get products below their reorder minimums
+    alerts_query = db.session.query(ReorderPoint, Product).join(Product).filter(
+        ReorderPoint.is_active == True,
+        Product.quantity < ReorderPoint.minimum_quantity
+    )
+    
+    critical_alerts_count = alerts_query.filter(Product.quantity == 0).count()
+    urgent_alerts_count = alerts_query.filter(
+        Product.quantity > 0,
+        Product.quantity < ReorderPoint.minimum_quantity * 0.5
+    ).count()
+    warning_alerts_count = alerts_query.filter(
+        Product.quantity >= ReorderPoint.minimum_quantity * 0.5,
+        Product.quantity < ReorderPoint.minimum_quantity
+    ).count()
+    
+    total_active_alerts = critical_alerts_count + urgent_alerts_count + warning_alerts_count
+    
+    # Recent transaction activity (last 7 days)
+    from datetime import datetime, timedelta
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    
+    recent_transactions = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago
+    ).order_by(StockTransaction.created_at.desc()).limit(10).all()
+    
+    transactions_last_week = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago
+    ).count()
+    
+    # Stock movement analysis (last 7 days)
+    increases_last_week = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago,
+        StockTransaction.quantity_change > 0
+    ).count()
+    
+    decreases_last_week = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago,
+        StockTransaction.quantity_change < 0
+    ).count()
+    
+    # Top products by value
+    top_products_by_value = db.session.query(
+        Product,
+        (Product.price * Product.quantity).label('total_value')
+    ).filter(Product.quantity > 0).order_by(
+        (Product.price * Product.quantity).desc()
+    ).limit(5).all()
+    
+    # Products requiring attention (low stock with high value)
+    attention_products = db.session.query(Product).filter(
+        Product.quantity < 10,
+        Product.quantity > 0,
+        Product.price > 10.0
+    ).order_by((Product.price * Product.quantity).desc()).limit(5).all()
+    
+    # Supplier analysis
+    suppliers_with_products = db.session.query(
+        Supplier, 
+        db.func.count(Product.id).label('product_count'),
+        db.func.sum(Product.quantity).label('total_stock'),
+        db.func.sum(Product.price * Product.quantity).label('total_value')
+    ).outerjoin(Product).group_by(Supplier.id).having(
+        db.func.count(Product.id) > 0
+    ).order_by(db.func.sum(Product.price * Product.quantity).desc()).limit(5).all()
+    
+    # Package all data for template
+    dashboard_data = {
+        'metrics': {
+            'total_products': total_products,
+            'total_suppliers': total_suppliers,
+            'total_transactions': total_transactions,
+            'products_with_stock': products_with_stock,
+            'out_of_stock_products': out_of_stock_products,
+            'low_stock_products': low_stock_products,
+            'total_inventory_value': total_inventory_value,
+            'active_reorder_points': active_reorder_points
+        },
+        'alerts': {
+            'total_active_alerts': total_active_alerts,
+            'critical_alerts_count': critical_alerts_count,
+            'urgent_alerts_count': urgent_alerts_count,
+            'warning_alerts_count': warning_alerts_count
+        },
+        'activity': {
+            'transactions_last_week': transactions_last_week,
+            'increases_last_week': increases_last_week,
+            'decreases_last_week': decreases_last_week,
+            'recent_transactions': recent_transactions
+        },
+        'top_products': top_products_by_value,
+        'attention_products': attention_products,
+        'top_suppliers': suppliers_with_products
+    }
+    
+    return render_template('dashboard.html', data=dashboard_data)
+
 # Run the application
 if __name__ == '__main__':
     with app.app_context():
