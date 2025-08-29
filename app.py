@@ -5,6 +5,8 @@ import csv
 import io
 from flask import make_response
 from datetime import datetime
+from pdf_reports import generate_inventory_summary_pdf, generate_low_stock_pdf, generate_supplier_performance_pdf
+from flask import send_file
 
 def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
     """
@@ -1363,6 +1365,203 @@ def import_stock_adjustments():
             flash(f'Import failed: {str(e)}', 'error')
     
     return render_template('import_stock_adjustments.html')
+
+@app.route('/reports')
+def reports():
+    """Professional reports dashboard and selection"""
+    # Get summary statistics for the reports page
+    stats = {
+        'total_products': Product.query.count(),
+        'total_transactions': StockTransaction.query.count(),
+        'total_suppliers': Supplier.query.count(),
+        'active_alerts': ReorderPoint.query.filter(ReorderPoint.is_active == True).count(),
+        'out_of_stock': Product.query.filter(Product.quantity == 0).count(),
+        'low_stock': Product.query.filter(Product.quantity > 0, Product.quantity < 10).count(),
+        'last_transaction': StockTransaction.query.order_by(StockTransaction.created_at.desc()).first()
+    }
+    
+    # Calculate inventory value
+    inventory_value_query = db.session.query(db.func.sum(Product.price * Product.quantity)).scalar()
+    stats['total_inventory_value'] = inventory_value_query if inventory_value_query else 0.0
+    
+    # Get active alerts count
+    alerts_count = db.session.query(ReorderPoint, Product).join(Product).filter(
+        ReorderPoint.is_active == True,
+        Product.quantity < ReorderPoint.minimum_quantity
+    ).count()
+    stats['active_alerts_count'] = alerts_count
+    
+    return render_template('reports.html', stats=stats)
+
+@app.route('/reports/generate/inventory_summary')
+def generate_inventory_summary_report():
+    """Generate and download comprehensive inventory summary PDF report"""
+    try:
+        # Generate PDF
+        pdf_buffer = generate_inventory_summary_pdf()
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'Inventory_Summary_Report_{timestamp}.pdf'
+        
+        # Send file
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating inventory summary report: {str(e)}', 'error')
+        return redirect(url_for('reports'))
+
+@app.route('/reports/generate/low_stock_alerts')
+def generate_low_stock_alerts_report():
+    """Generate and download low stock alerts PDF report"""
+    try:
+        # Generate PDF
+        pdf_buffer = generate_low_stock_pdf()
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'Low_Stock_Alerts_Report_{timestamp}.pdf'
+        
+        # Send file
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating low stock alerts report: {str(e)}', 'error')
+        return redirect(url_for('reports'))
+
+@app.route('/reports/generate/supplier_performance')
+def generate_supplier_performance_report():
+    """Generate and download supplier performance PDF report"""
+    try:
+        # Generate PDF
+        pdf_buffer = generate_supplier_performance_pdf()
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'Supplier_Performance_Report_{timestamp}.pdf'
+        
+        # Send file
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating supplier performance report: {str(e)}', 'error')
+        return redirect(url_for('reports'))
+
+@app.route('/reports/preview/<report_type>')
+def preview_report(report_type):
+    """Preview report data before generating PDF"""
+    try:
+        if report_type == 'inventory_summary':
+            # Get data for inventory summary preview
+            total_products = Product.query.count()
+            products_with_stock = Product.query.filter(Product.quantity > 0).count()
+            out_of_stock = Product.query.filter(Product.quantity == 0).count()
+            low_stock = Product.query.filter(Product.quantity > 0, Product.quantity < 10).count()
+            
+            # Top products by value
+            top_products = db.session.query(Product).filter(Product.quantity > 0).order_by(
+                (Product.price * Product.quantity).desc()
+            ).limit(10).all()
+            
+            preview_data = {
+                'title': 'Inventory Summary Report',
+                'metrics': {
+                    'total_products': total_products,
+                    'products_with_stock': products_with_stock,
+                    'out_of_stock': out_of_stock,
+                    'low_stock': low_stock
+                },
+                'top_products': top_products
+            }
+            
+        elif report_type == 'low_stock_alerts':
+            # Get alerts data
+            alerts_query = db.session.query(ReorderPoint, Product).join(Product).filter(
+                ReorderPoint.is_active == True,
+                Product.quantity < ReorderPoint.minimum_quantity
+            )
+            
+            critical_alerts = alerts_query.filter(Product.quantity == 0).all()
+            urgent_alerts = alerts_query.filter(
+                Product.quantity > 0,
+                Product.quantity < ReorderPoint.minimum_quantity * 0.5
+            ).all()
+            warning_alerts = alerts_query.filter(
+                Product.quantity >= ReorderPoint.minimum_quantity * 0.5,
+                Product.quantity < ReorderPoint.minimum_quantity
+            ).all()
+            
+            preview_data = {
+                'title': 'Low Stock Alerts Report',
+                'critical_count': len(critical_alerts),
+                'urgent_count': len(urgent_alerts),
+                'warning_count': len(warning_alerts),
+                'critical_alerts': critical_alerts[:5],  # Show first 5
+                'urgent_alerts': urgent_alerts[:5],
+                'warning_alerts': warning_alerts[:5]
+            }
+            
+        elif report_type == 'supplier_performance':
+            # Get supplier data
+            suppliers_data = db.session.query(
+                Supplier, 
+                db.func.count(Product.id).label('product_count'),
+                db.func.sum(Product.quantity).label('total_stock'),
+                db.func.sum(Product.price * Product.quantity).label('total_value')
+            ).outerjoin(Product).group_by(Supplier.id).order_by(
+                db.func.sum(Product.price * Product.quantity).desc()
+            ).limit(10).all()
+            
+            preview_data = {
+                'title': 'Supplier Performance Report',
+                'total_suppliers': Supplier.query.count(),
+                'active_suppliers': len([s for s in suppliers_data if s[1] > 0]),
+                'top_suppliers': suppliers_data[:5]  # Show top 5
+            }
+            
+        else:
+            flash('Invalid report type', 'error')
+            return redirect(url_for('reports'))
+        
+        return render_template('report_preview.html', data=preview_data, report_type=report_type)
+        
+    except Exception as e:
+        flash(f'Error previewing report: {str(e)}', 'error')
+        return redirect(url_for('reports'))
+
+# Add this route to integrate with existing dashboard
+@app.route('/reports/quick/<report_type>')
+def quick_report_generation(report_type):
+    """Quick report generation from dashboard or other pages"""
+    try:
+        if report_type == 'inventory_summary':
+            return redirect(url_for('generate_inventory_summary_report'))
+        elif report_type == 'low_stock_alerts':
+            return redirect(url_for('generate_low_stock_alerts_report'))
+        elif report_type == 'supplier_performance':
+            return redirect(url_for('generate_supplier_performance_report'))
+        else:
+            flash('Invalid report type', 'error')
+            return redirect(url_for('reports'))
+            
+    except Exception as e:
+        flash(f'Error generating report: {str(e)}', 'error')
+        return redirect(url_for('reports'))
 
 # Run the application
 if __name__ == '__main__':

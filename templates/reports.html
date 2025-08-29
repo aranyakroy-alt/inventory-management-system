@@ -1,0 +1,736 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="reports-page">
+    <div class="page-header">
+        <h2>Professional Reports & Analytics</h2>
+        <p>Generate comprehensive PDF reports for business analysis, compliance, and strategic planning</p>
+    </div>
+
+    <!-- System Overview -->
+    <div class="overview-section">
+        <h3>Current System Overview</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.total_products }}</div>
+                <div class="stat-label">Products</div>
+                <div class="stat-detail">{{ stats.out_of_stock }} out of stock</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${{ "{:,.2f}".format(stats.total_inventory_value) }}</div>
+                <div class="stat-label">Inventory Value</div>
+                <div class="stat-detail">Total current value</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.active_alerts_count }}</div>
+                <div class="stat-label">Active Alerts</div>
+                <div class="stat-detail">{{ stats.low_stock }} low stock items</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">{{ stats.total_suppliers }}</div>
+                <div class="stat-label">Suppliers</div>
+                <div class="stat-detail">Business partners</div>
+            </div>
+        </div>
+        {% if stats.last_transaction %}
+        <div class="last-activity">
+            <strong>Last Activity:</strong> 
+            {{ stats.last_transaction.transaction_display }} for "{{ stats.last_transaction.product.name }}" 
+            on {{ stats.last_transaction.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Available Reports -->
+    <div class="reports-section">
+        <h3>Available Reports</h3>
+        <div class="reports-grid">
+            
+            <!-- Inventory Summary Report -->
+            <div class="report-card featured">
+                <div class="report-header">
+                    <div class="report-icon">📊</div>
+                    <div class="report-title">
+                        <h4>Inventory Summary Report</h4>
+                        <p>Comprehensive overview of your entire inventory system</p>
+                    </div>
+                </div>
+                <div class="report-details">
+                    <strong>Includes:</strong>
+                    <ul>
+                        <li>Key performance indicators (KPIs)</li>
+                        <li>Top products by inventory value</li>
+                        <li>Stock status distribution analysis</li>
+                        <li>Low stock alerts summary</li>
+                        <li>Supplier performance overview</li>
+                        <li>Executive summary for stakeholders</li>
+                    </ul>
+                </div>
+                <div class="report-stats">
+                    <div class="report-stat">
+                        <span class="stat-value">{{ stats.total_products }}</span>
+                        <span class="stat-label">Products</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-value">${{ "{:,.0f}".format(stats.total_inventory_value) }}</span>
+                        <span class="stat-label">Total Value</span>
+                    </div>
+                </div>
+                <div class="report-actions">
+                    <a href="{{ url_for('preview_report', report_type='inventory_summary') }}" 
+                       class="btn btn-secondary">Preview Data</a>
+                    <a href="{{ url_for('generate_inventory_summary_report') }}" 
+                       class="btn btn-primary report-btn">
+                        📄 Generate PDF Report
+                    </a>
+                </div>
+            </div>
+
+            <!-- Low Stock Alerts Report -->
+            <div class="report-card {% if stats.active_alerts_count > 0 %}urgent{% endif %}">
+                <div class="report-header">
+                    <div class="report-icon">{% if stats.active_alerts_count > 0 %}⚠️{% else %}✅{% endif %}</div>
+                    <div class="report-title">
+                        <h4>Low Stock Alerts Report</h4>
+                        <p>Detailed analysis of products requiring immediate attention</p>
+                    </div>
+                </div>
+                <div class="report-details">
+                    <strong>Includes:</strong>
+                    <ul>
+                        <li>Critical alerts (out of stock products)</li>
+                        <li>Urgent alerts (very low stock items)</li>
+                        <li>Warning alerts (below minimum thresholds)</li>
+                        <li>Suggested reorder quantities and values</li>
+                        <li>Supplier contact information for reordering</li>
+                        <li>Priority action recommendations</li>
+                    </ul>
+                </div>
+                <div class="report-stats">
+                    <div class="report-stat">
+                        <span class="stat-value">{{ stats.active_alerts_count }}</span>
+                        <span class="stat-label">Active Alerts</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-value">{{ stats.out_of_stock }}</span>
+                        <span class="stat-label">Out of Stock</span>
+                    </div>
+                </div>
+                <div class="report-actions">
+                    <a href="{{ url_for('preview_report', report_type='low_stock_alerts') }}" 
+                       class="btn btn-secondary">Preview Data</a>
+                    <a href="{{ url_for('generate_low_stock_alerts_report') }}" 
+                       class="btn btn-{% if stats.active_alerts_count > 0 %}warning{% else %}primary{% endif %} report-btn">
+                        ⚠️ Generate Alerts Report
+                    </a>
+                </div>
+            </div>
+
+            <!-- Supplier Performance Report -->
+            <div class="report-card">
+                <div class="report-header">
+                    <div class="report-icon">🏢</div>
+                    <div class="report-title">
+                        <h4>Supplier Performance Report</h4>
+                        <p>Comprehensive analysis of supplier relationships and performance</p>
+                    </div>
+                </div>
+                <div class="report-details">
+                    <strong>Includes:</strong>
+                    <ul>
+                        <li>Supplier inventory value analysis</li>
+                        <li>Product count and stock levels per supplier</li>
+                        <li>Complete supplier contact information</li>
+                        <li>Active vs. inactive supplier identification</li>
+                        <li>Supplier dependency analysis</li>
+                        <li>Relationship optimization recommendations</li>
+                    </ul>
+                </div>
+                <div class="report-stats">
+                    <div class="report-stat">
+                        <span class="stat-value">{{ stats.total_suppliers }}</span>
+                        <span class="stat-label">Suppliers</span>
+                    </div>
+                    <div class="report-stat">
+                        <span class="stat-value">{{ ((stats.total_products / stats.total_suppliers)|round|int) if stats.total_suppliers > 0 else 0 }}</span>
+                        <span class="stat-label">Avg Products</span>
+                    </div>
+                </div>
+                <div class="report-actions">
+                    <a href="{{ url_for('preview_report', report_type='supplier_performance') }}" 
+                       class="btn btn-secondary">Preview Data</a>
+                    <a href="{{ url_for('generate_supplier_performance_report') }}" 
+                       class="btn btn-primary report-btn">
+                        🏢 Generate Supplier Report
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Features -->
+    <div class="features-section">
+        <h3>Professional Report Features</h3>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <div class="feature-content">
+                    <h4>Professional Design</h4>
+                    <p>Clean, branded PDF reports suitable for executive presentations and stakeholder meetings</p>
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <div class="feature-content">
+                    <h4>Real-Time Data</h4>
+                    <p>Reports generated with current system data including latest transactions and stock levels</p>
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <div class="feature-content">
+                    <h4>Easy Export</h4>
+                    <p>Download reports instantly as PDF files for sharing, archiving, or printing</p>
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-content">
+                    <h4>Quick Generation</h4>
+                    <p>Fast report processing with comprehensive data analysis and professional formatting</p>
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-content">
+                    <h4>Data Security</h4>
+                    <p>Reports generated on-demand without storing sensitive business data externally</p>
+                </div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <div class="feature-content">
+                    <h4>Business Intelligence</h4>
+                    <p>Actionable insights with KPIs, trends analysis, and strategic recommendations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Tips -->
+    <div class="tips-section">
+        <h3>Report Usage Tips</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <div class="tip-icon">📅</div>
+                <div class="tip-content">
+                    <h4>Regular Reporting</h4>
+                    <p>Generate weekly inventory summaries and monthly supplier performance reports for consistent monitoring</p>
+                </div>
+            </div>
+            <div class="tip-card">
+                <div class="tip-icon">📧</div>
+                <div class="tip-content">
+                    <h4>Stakeholder Sharing</h4>
+                    <p>Share professional PDF reports with management, investors, or business partners</p>
+                </div>
+            </div>
+            <div class="tip-card">
+                <div class="tip-icon">📋</div>
+                <div class="tip-content">
+                    <h4>Decision Making</h4>
+                    <p>Use low stock alerts and supplier reports to make informed purchasing and partnership decisions</p>
+                </div>
+            </div>
+            <div class="tip-card">
+                <div class="tip-icon">💼</div>
+                <div class="tip-content">
+                    <h4>Business Planning</h4>
+                    <p>Leverage inventory trends and performance data for strategic business planning and forecasting</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions-section">
+        <h3>Quick Actions</h3>
+        <div class="quick-actions">
+            <a href="{{ url_for('dashboard') }}" class="action-btn secondary">
+                <div class="action-icon">📊</div>
+                <div class="action-text">Analytics Dashboard</div>
+            </a>
+            <a href="{{ url_for('alerts') }}" class="action-btn {% if stats.active_alerts_count > 0 %}warning{% else %}secondary{% endif %}">
+                <div class="action-icon">⚠️</div>
+                <div class="action-text">View Alerts</div>
+            </a>
+            <a href="{{ url_for('suppliers') }}" class="action-btn secondary">
+                <div class="action-icon">🏢</div>
+                <div class="action-text">Manage Suppliers</div>
+            </a>
+            <a href="{{ url_for('import_export') }}" class="action-btn secondary">
+                <div class="action-icon">📁</div>
+                <div class="action-text">Data Import/Export</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.reports-page {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.page-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2.2rem;
+    font-weight: 600;
+}
+
+.page-header p {
+    margin: 0;
+    opacity: 0.95;
+    font-size: 1.1rem;
+    font-weight: 300;
+}
+
+/* Overview Section */
+.overview-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border: 1px solid #f1f3f4;
+}
+
+.overview-section h3 {
+    color: #2c3e50;
+    margin: 0 0 2rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #ecf0f1;
+    font-size: 1.4rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 12px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-3px);
+    border-color: #3498db;
+    box-shadow: 0 8px 25px rgba(52, 152, 219, 0.15);
+}
+
+.stat-item:hover::before {
+    opacity: 1;
+}
+
+.stat-number {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.stat-label {
+    color: #7f8c8d;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.stat-detail {
+    color: #95a5a6;
+    font-size: 0.85rem;
+}
+
+.last-activity {
+    text-align: center;
+    color: #7f8c8d;
+    font-size: 0.95rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
+}
+
+/* Reports Section */
+.reports-section {
+    margin-bottom: 3rem;
+}
+
+.reports-section h3 {
+    color: #2c3e50;
+    margin-bottom: 2rem;
+    font-size: 1.8rem;
+    text-align: center;
+}
+
+.reports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+.report-card {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.report-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.report-card.featured {
+    border-color: #3498db;
+    box-shadow: 0 8px 25px rgba(52, 152, 219, 0.12);
+}
+
+.report-card.featured::before {
+    opacity: 1;
+}
+
+.report-card.urgent {
+    border-color: #f39c12;
+}
+
+.report-card.urgent::before {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+    opacity: 1;
+}
+
+.report-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+}
+
+.report-card:hover::before {
+    opacity: 1;
+}
+
+.report-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.report-icon {
+    font-size: 2.5rem;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+
+.report-title h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.report-title p {
+    color: #7f8c8d;
+    margin: 0;
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+.report-details {
+    margin-bottom: 1.5rem;
+}
+
+.report-details strong {
+    color: #2c3e50;
+    display: block;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.report-details ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: #7f8c8d;
+}
+
+.report-details li {
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.report-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.report-stat {
+    flex: 1;
+    text-align: center;
+}
+
+.report-stat .stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.report-stat .stat-label {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.report-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.report-btn {
+    flex: 1;
+    padding: 0.9rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.report-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+/* Features and Tips Sections */
+.features-section,
+.tips-section {
+    background: #f8f9fa;
+    padding: 3rem 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.features-section h3,
+.tips-section h3 {
+    color: #2c3e50;
+    margin-bottom: 2rem;
+    font-size: 1.6rem;
+    text-align: center;
+}
+
+.features-grid,
+.tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.feature-card,
+.tip-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.feature-card:hover,
+.tip-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+.feature-icon,
+.tip-icon {
+    font-size: 2rem;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.feature-content h4,
+.tip-content h4 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.feature-content p,
+.tip-content p {
+    color: #7f8c8d;
+    margin: 0;
+    line-height: 1.5;
+    font-size: 0.9rem;
+}
+
+/* Quick Actions */
+.quick-actions-section {
+    text-align: center;
+    padding: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.quick-actions-section h3 {
+    color: #2c3e50;
+    margin-bottom: 2rem;
+    font-size: 1.4rem;
+}
+
+.quick-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-decoration: none;
+    min-width: 140px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.action-btn.secondary {
+    background: #ecf0f1;
+    color: #2c3e50;
+}
+
+.action-btn.warning {
+    background: #f39c12;
+    color: white;
+}
+
+.action-btn:hover {
+    transform: translateY(-3px);
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.action-btn.secondary:hover {
+    background: #d5dbdb;
+    color: #2c3e50;
+}
+
+.action-btn.warning:hover {
+    background: #e67e22;
+    color: white;
+}
+
+.action-icon {
+    font-size: 1.8rem;
+}
+
+.action-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .reports-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .features-grid,
+    .tips-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .report-stats {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .report-actions {
+        flex-direction: column;
+    }
+    
+    .quick-actions {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .feature-card,
+    .tip-card {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}

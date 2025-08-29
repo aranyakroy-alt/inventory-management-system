@@ -290,6 +290,52 @@
                 </div>
             </div>
         </div>
+
+        <!-- Professional Reports - NEW SECTION -->
+        <div class="dashboard-card featured-card">
+            <div class="card-header">
+                <h3>📄 Professional Reports</h3>
+                <a href="{{ url_for('reports') }}" class="view-all-link">View All Reports</a>
+            </div>
+            <div class="card-content">
+                <div class="reports-actions">
+                    <a href="{{ url_for('generate_inventory_summary_report') }}" class="report-action-btn primary">
+                        <div class="report-icon">📊</div>
+                        <div class="report-content">
+                            <div class="report-title">Inventory Summary</div>
+                            <div class="report-desc">Complete system overview with KPIs</div>
+                        </div>
+                    </a>
+                    
+                    <a href="{{ url_for('generate_low_stock_alerts_report') }}" 
+                       class="report-action-btn {% if data.alerts.total_active_alerts > 0 %}warning{% else %}secondary{% endif %}">
+                        <div class="report-icon">{% if data.alerts.total_active_alerts > 0 %}⚠️{% else %}✅{% endif %}</div>
+                        <div class="report-content">
+                            <div class="report-title">Stock Alerts Report</div>
+                            <div class="report-desc">
+                                {% if data.alerts.total_active_alerts > 0 %}
+                                    {{ data.alerts.total_active_alerts }} alerts active
+                                {% else %}
+                                    All products well-stocked
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="{{ url_for('generate_supplier_performance_report') }}" class="report-action-btn secondary">
+                        <div class="report-icon">🏢</div>
+                        <div class="report-content">
+                            <div class="report-title">Supplier Performance</div>
+                            <div class="report-desc">Detailed supplier analysis</div>
+                        </div>
+                    </a>
+                </div>
+                
+                <div class="reports-note">
+                    <small>📄 Generate professional PDF reports instantly for business analysis and stakeholder sharing</small>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -449,6 +495,12 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.12);
 }
 
+/* Featured Card for Reports */
+.featured-card {
+    border: 2px solid #3498db;
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.15);
+}
+
 .card-header {
     padding: 1.25rem;
     background: #f8f9fa;
@@ -458,10 +510,23 @@
     align-items: center;
 }
 
+.featured-card .card-header {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.featured-card .view-all-link {
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .card-header h3 {
     margin: 0;
     color: #2c3e50;
     font-size: 1.1rem;
+}
+
+.featured-card .card-header h3 {
+    color: white;
 }
 
 .view-all-link {
@@ -682,6 +747,79 @@
     text-align: center;
 }
 
+/* Professional Reports Styling */
+.reports-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.report-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.report-action-btn.primary {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.report-action-btn.secondary {
+    background: #f8f9fa;
+    color: #2c3e50;
+    border-color: #e9ecef;
+}
+
+.report-action-btn.warning {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.report-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    text-decoration: none;
+}
+
+.report-action-btn.primary:hover { color: white; }
+.report-action-btn.secondary:hover { color: #2c3e50; border-color: #3498db; }
+.report-action-btn.warning:hover { color: white; }
+
+.report-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+}
+
+.report-content {
+    flex: 1;
+}
+
+.report-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+}
+
+.report-desc {
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+.reports-note {
+    text-align: center;
+    padding: 0.75rem;
+    background: #f0f8ff;
+    border-radius: 6px;
+    color: #4a90e2;
+}
+
 .empty-message {
     text-align: center;
     color: #95a5a6;
@@ -721,6 +859,16 @@
     
     .quick-actions {
         grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .reports-actions {
+        gap: 0.75rem;
+    }
+    
+    .report-action-btn {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.75rem;
     }
 }
 </style>

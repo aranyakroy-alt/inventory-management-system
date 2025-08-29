@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="preview-page">
+    <div class="preview-header">
+        <h2>{{ data.title }} - Data Preview</h2>
+        <p>Review the data that will be included in your PDF report before generating</p>
+    </div>
+
+    <div class="preview-container">
+        <div class="preview-sidebar">
+            <div class="preview-info">
+                <h3>Report Information</h3>
+                <div class="info-item">
+                    <label>Report Type:</label>
+                    <span>{{ data.title }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Generation Time:</label>
+                    <span>{{ moment().format('MMMM Do YYYY, h:mm a') if moment else 'Now' }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Format:</label>
+                    <span>Professional PDF</span>
+                </div>
+            </div>
+
+            <div class="preview-actions">
+                <a href="{{ url_for('generate_inventory_summary_report') if report_type == 'inventory_summary' 
+                           else url_for('generate_low_stock_alerts_report') if report_type == 'low_stock_alerts'
+                           else url_for('generate_supplier_performance_report') }}" 
+                   class="btn btn-primary generate-btn">
+                    📄 Generate PDF Report
+                </a>
+                <a href="{{ url_for('reports') }}" class="btn btn-secondary">← Back to Reports</a>
+            </div>
+        </div>
+
+        <div class="preview-content">
+            {% if report_type == 'inventory_summary' %}
+                <!-- Inventory Summary Preview -->
+                <div class="preview-section">
+                    <h3>Key Performance Indicators</h3>
+                    <div class="metrics-preview">
+                        <div class="metric-item">
+                            <div class="metric-value">{{ data.metrics.total_products }}</div>
+                            <div class="metric-label">Total Products</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">{{ data.metrics.products_with_stock }}</div>
+                            <div class="metric-label">In Stock</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">{{ data.metrics.out_of_stock }}</div>
+                            <div class="metric-label">Out of Stock</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">{{ data.metrics.low_stock }}</div>
+                            <div class="metric-label">Low Stock</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if data.top_products %}
+                <div class="preview-section">
+                    <h3>Top Products by Value (Preview - First 10)</h3>
+                    <div class="table-preview">
+                        <table class="preview-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>SKU</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>Total Value</th>
+                                    <th>Supplier</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in data.top_products %}
+                                <tr>
+                                    <td>{{ product.name }}</td>
+                                    <td>{{ product.sku }}</td>
+                                    <td>{{ product.quantity }}</td>
+                                    <td>${{ "%.2f"|format(product.price) }}</td>
+                                    <td>${{ "%.2f"|format(product.price * product.quantity) }}</td>
+                                    <td>{{ product.supplier.name if product.supplier else "No Supplier" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+            {% elif report_type == 'low_stock_alerts' %}
+                <!-- Low Stock Alerts Preview -->
+                <div class="preview-section">
+                    <h3>Alert Summary</h3>
+                    <div class="alert-metrics">
+                        <div class="alert-metric critical">
+                            <div class="metric-value">{{ data.critical_count }}</div>
+                            <div class="metric-label">Critical Alerts</div>
+                            <div class="metric-description">Out of Stock</div>
+                        </div>
+                        <div class="alert-metric urgent">
+                            <div class="metric-value">{{ data.urgent_count }}</div>
+                            <div class="metric-label">Urgent Alerts</div>
+                            <div class="metric-description">Very Low Stock</div>
+                        </div>
+                        <div class="alert-metric warning">
+                            <div class="metric-value">{{ data.warning_count }}</div>
+                            <div class="metric-label">Warning Alerts</div>
+                            <div class="metric-description">Below Minimum</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if data.critical_alerts %}
+                <div class="preview-section">
+                    <h3>Critical Alerts (Preview - First 5)</h3>
+                    <div class="alerts-preview">
+                        {% for reorder_point, product in data.critical_alerts %}
+                        <div class="alert-item critical">
+                            <div class="alert-product">
+                                <h4>{{ product.name }}</h4>
+                                <p>SKU: {{ product.sku }}</p>
+                            </div>
+                            <div class="alert-details">
+                                <span class="current-stock">Current: {{ product.quantity }}</span>
+                                <span class="minimum-stock">Minimum: {{ reorder_point.minimum_quantity }}</span>
+                                <span class="suggested-order">Suggested Order: {{ reorder_point.suggested_order_amount }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if data.urgent_alerts %}
+                <div class="preview-section">
+                    <h3>Urgent Alerts (Preview - First 5)</h3>
+                    <div class="alerts-preview">
+                        {% for reorder_point, product in data.urgent_alerts %}
+                        <div class="alert-item urgent">
+                            <div class="alert-product">
+                                <h4>{{ product.name }}</h4>
+                                <p>SKU: {{ product.sku }}</p>
+                            </div>
+                            <div class="alert-details">
+                                <span class="current-stock">Current: {{ product.quantity }}</span>
+                                <span class="minimum-stock">Minimum: {{ reorder_point.minimum_quantity }}</span>
+                                <span class="suggested-order">Suggested Order: {{ reorder_point.suggested_order_amount }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+            {% elif report_type == 'supplier_performance' %}
+                <!-- Supplier Performance Preview -->
+                <div class="preview-section">
+                    <h3>Supplier Overview</h3>
+                    <div class="metrics-preview">
+                        <div class="metric-item">
+                            <div class="metric-value">{{ data.total_suppliers }}</div>
+                            <div class="metric-label">Total Suppliers</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">{{ data.active_suppliers }}</div>
+                            <div class="metric-label">Active Suppliers</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">{{ ((data.total_suppliers - data.active_suppliers)) }}</div>
+                            <div class="metric-label">Inactive Suppliers</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if data.top_suppliers %}
+                <div class="preview-section">
+                    <h3>Top Suppliers by Value (Preview - First 5)</h3>
+                    <div class="table-preview">
+                        <table class="preview-table">
+                            <thead>
+                                <tr>
+                                    <th>Supplier Name</th>
+                                    <th>Products</th>
+                                    <th>Total Stock</th>
+                                    <th>Inventory Value</th>
+                                    <th>Contact</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for supplier, product_count, total_stock, total_value in data.top_suppliers %}
+                                <tr>
+                                    <td>{{ supplier.name }}</td>
+                                    <td>{{ product_count }}</td>
+                                    <td>{{ total_stock or 0 }}</td>
+                                    <td>${{ "%.2f"|format(total_value or 0) }}</td>
+                                    <td>
+                                        {% if supplier.contact_person %}
+                                            {{ supplier.contact_person }}
+                                            {% if supplier.email %}<br>{{ supplier.email }}{% endif %}
+                                        {% else %}
+                                            No contact info
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
+
+            <!-- Report Features -->
+            <div class="preview-section">
+                <h3>Full Report Will Include</h3>
+                <div class="features-list">
+                    {% if report_type == 'inventory_summary' %}
+                        <div class="feature-item">✅ Complete KPI dashboard with all metrics</div>
+                        <div class="feature-item">✅ Full product inventory listing with values</div>
+                        <div class="feature-item">✅ Comprehensive low stock alerts analysis</div>
+                        <div class="feature-item">✅ Supplier performance breakdown</div>
+                        <div class="feature-item">✅ Executive summary and recommendations</div>
+                        <div class="feature-item">✅ Professional formatting and branding</div>
+                    {% elif report_type == 'low_stock_alerts' %}
+                        <div class="feature-item">✅ All critical, urgent, and warning alerts</div>
+                        <div class="feature-item">✅ Detailed reorder recommendations</div>
+                        <div class="feature-item">✅ Supplier contact information for reordering</div>
+                        <div class="feature-item">✅ Total reorder value calculations</div>
+                        <div class="feature-item">✅ Priority-based action recommendations</div>
+                        <div class="feature-item">✅ Professional alert categorization</div>
+                    {% elif report_type == 'supplier_performance' %}
+                        <div class="feature-item">✅ Complete supplier performance analysis</div>
+                        <div class="feature-item">✅ Inventory value breakdown by supplier</div>
+                        <div class="feature-item">✅ Full supplier contact directory</div>
+                        <div class="feature-item">✅ Active vs inactive supplier identification</div>
+                        <div class="feature-item">✅ Supplier relationship optimization tips</div>
+                        <div class="feature-item">✅ Professional business formatting</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.preview-page {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.preview-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    border-radius: 12px;
+}
+
+.preview-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.8rem;
+}
+
+.preview-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.preview-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.preview-sidebar {
+    position: sticky;
+    top: 2rem;
+}
+
+.preview-info {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.preview-info h3 {
+    color: #2c3e50;
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.info-item label {
+    font-weight: 500;
+    color: #7f8c8d;
+    margin: 0;
+}
+
+.info-item span {
+    color: #2c3e50;
+    text-align: right;
+    font-weight: 500;
+}
+
+.preview-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.generate-btn {
+    font-weight: 600;
+    padding: 1rem;
+    font-size: 1rem;
+}
+
+.preview-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.preview-section {
+    padding: 2rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.preview-section:last-child {
+    border-bottom: none;
+}
+
+.preview-section h3 {
+    color: #2c3e50;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.3rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.metrics-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+}
+
+.metric-item {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.alert-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.5rem;
+}
+
+.alert-metric {
+    text-align: center;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+
+.alert-metric.critical {
+    background: #ffebee;
+    border-left-color: #f44336;
+}
+
+.alert-metric.urgent {
+    background: #fff8e1;
+    border-left-color: #ff9800;
+}
+
+.alert-metric.warning {
+    background: #fff3e0;
+    border-left-color: #ff5722;
+}
+
+.metric-description {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    margin-top: 0.25rem;
+}
+
+.table-preview {
+    overflow-x: auto;
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.preview-table th {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 500;
+}
+
+.preview-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.preview-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.alerts-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+
+.alert-item.critical {
+    background: #ffebee;
+    border-left-color: #f44336;
+}
+
+.alert-item.urgent {
+    background: #fff8e1;
+    border-left-color: #ff9800;
+}
+
+.alert-product h4 {
+    margin: 0 0 0.25rem 0;
+    color: #2c3e50;
+}
+
+.alert-product p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.alert-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    font-size: 0.9rem;
+}
+
+.current-stock,
+.minimum-stock,
+.suggested-order {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.current-stock {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.minimum-stock {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.suggested-order {
+    background: #e8f5e8;
+    color: #388e3c;
+}
+
+.features-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.feature-item {
+    padding: 1rem;
+    background: #f0fff4;
+    border-radius: 6px;
+    border-left: 3px solid #4caf50;
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .preview-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .preview-sidebar {
+        position: relative;
+        top: auto;
+    }
+    
+    .metrics-preview,
+    .alert-metrics {
+        grid-template-columns: 1fr;
+    }
+    
+    .alert-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .alert-details {
+        align-items: flex-start;
+        width: 100%;
+    }
+    
+    .features-list {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
