@@ -7,6 +7,10 @@ from flask import make_response
 from datetime import datetime
 from pdf_reports import generate_inventory_summary_pdf, generate_low_stock_pdf, generate_supplier_performance_pdf
 from flask import send_file
+from flask import jsonify
+from datetime import datetime, timedelta
+from sqlalchemy import func, and_
+
 
 def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
     """
@@ -667,123 +671,6 @@ def quick_reorder(product_id):
     
     return redirect(url_for('alerts'))
 
-@app.route('/dashboard')
-def dashboard():
-    """Analytics dashboard with key inventory metrics and insights"""
-    
-    # Basic inventory metrics
-    total_products = Product.query.count()
-    total_suppliers = Supplier.query.count()
-    total_transactions = StockTransaction.query.count()
-    
-    # Stock status analysis
-    products_with_stock = Product.query.filter(Product.quantity > 0).count()
-    out_of_stock_products = Product.query.filter(Product.quantity == 0).count()
-    low_stock_products = Product.query.filter(Product.quantity > 0, Product.quantity < 10).count()
-    
-    # Calculate total inventory value
-    inventory_value_query = db.session.query(db.func.sum(Product.price * Product.quantity)).scalar()
-    total_inventory_value = inventory_value_query if inventory_value_query else 0.0
-    
-    # Alert analysis (if reorder points exist)
-    active_reorder_points = ReorderPoint.query.filter(ReorderPoint.is_active == True).count()
-    
-    # Get products below their reorder minimums
-    alerts_query = db.session.query(ReorderPoint, Product).join(Product).filter(
-        ReorderPoint.is_active == True,
-        Product.quantity < ReorderPoint.minimum_quantity
-    )
-    
-    critical_alerts_count = alerts_query.filter(Product.quantity == 0).count()
-    urgent_alerts_count = alerts_query.filter(
-        Product.quantity > 0,
-        Product.quantity < ReorderPoint.minimum_quantity * 0.5
-    ).count()
-    warning_alerts_count = alerts_query.filter(
-        Product.quantity >= ReorderPoint.minimum_quantity * 0.5,
-        Product.quantity < ReorderPoint.minimum_quantity
-    ).count()
-    
-    total_active_alerts = critical_alerts_count + urgent_alerts_count + warning_alerts_count
-    
-    # Recent transaction activity (last 7 days)
-    from datetime import datetime, timedelta
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    
-    recent_transactions = StockTransaction.query.filter(
-        StockTransaction.created_at >= seven_days_ago
-    ).order_by(StockTransaction.created_at.desc()).limit(10).all()
-    
-    transactions_last_week = StockTransaction.query.filter(
-        StockTransaction.created_at >= seven_days_ago
-    ).count()
-    
-    # Stock movement analysis (last 7 days)
-    increases_last_week = StockTransaction.query.filter(
-        StockTransaction.created_at >= seven_days_ago,
-        StockTransaction.quantity_change > 0
-    ).count()
-    
-    decreases_last_week = StockTransaction.query.filter(
-        StockTransaction.created_at >= seven_days_ago,
-        StockTransaction.quantity_change < 0
-    ).count()
-    
-    # Top products by value
-    top_products_by_value = db.session.query(
-        Product,
-        (Product.price * Product.quantity).label('total_value')
-    ).filter(Product.quantity > 0).order_by(
-        (Product.price * Product.quantity).desc()
-    ).limit(5).all()
-    
-    # Products requiring attention (low stock with high value)
-    attention_products = db.session.query(Product).filter(
-        Product.quantity < 10,
-        Product.quantity > 0,
-        Product.price > 10.0
-    ).order_by((Product.price * Product.quantity).desc()).limit(5).all()
-    
-    # Supplier analysis
-    suppliers_with_products = db.session.query(
-        Supplier, 
-        db.func.count(Product.id).label('product_count'),
-        db.func.sum(Product.quantity).label('total_stock'),
-        db.func.sum(Product.price * Product.quantity).label('total_value')
-    ).outerjoin(Product).group_by(Supplier.id).having(
-        db.func.count(Product.id) > 0
-    ).order_by(db.func.sum(Product.price * Product.quantity).desc()).limit(5).all()
-    
-    # Package all data for template
-    dashboard_data = {
-        'metrics': {
-            'total_products': total_products,
-            'total_suppliers': total_suppliers,
-            'total_transactions': total_transactions,
-            'products_with_stock': products_with_stock,
-            'out_of_stock_products': out_of_stock_products,
-            'low_stock_products': low_stock_products,
-            'total_inventory_value': total_inventory_value,
-            'active_reorder_points': active_reorder_points
-        },
-        'alerts': {
-            'total_active_alerts': total_active_alerts,
-            'critical_alerts_count': critical_alerts_count,
-            'urgent_alerts_count': urgent_alerts_count,
-            'warning_alerts_count': warning_alerts_count
-        },
-        'activity': {
-            'transactions_last_week': transactions_last_week,
-            'increases_last_week': increases_last_week,
-            'decreases_last_week': decreases_last_week,
-            'recent_transactions': recent_transactions
-        },
-        'top_products': top_products_by_value,
-        'attention_products': attention_products,
-        'top_suppliers': suppliers_with_products
-    }
-    
-    return render_template('dashboard.html', data=dashboard_data)
 
 @app.route('/export/products')
 def export_products():
@@ -1562,6 +1449,484 @@ def quick_report_generation(report_type):
     except Exception as e:
         flash(f'Error generating report: {str(e)}', 'error')
         return redirect(url_for('reports'))
+
+@app.route('/api/charts/stock_distribution')
+def api_stock_distribution():
+    """API endpoint for stock distribution pie chart data"""
+    try:
+        # Calculate stock distribution
+        in_stock = Product.query.filter(Product.quantity >= 10).count()
+        low_stock = Product.query.filter(Product.quantity > 0, Product.quantity < 10).count()
+        out_of_stock = Product.query.filter(Product.quantity == 0).count()
+        
+        data = {
+            'labels': ['In Stock', 'Low Stock', 'Out of Stock'],
+            'datasets': [{
+                'data': [in_stock, low_stock, out_of_stock],
+                'backgroundColor': ['#27ae60', '#f39c12', '#e74c3c'],
+                'borderWidth': 3,
+                'borderColor': '#ffffff'
+            }],
+            'total': in_stock + low_stock + out_of_stock
+        }
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/charts/top_products')
+def api_top_products():
+    """API endpoint for top products bar chart data"""
+    try:
+        # Get top 8 products by value
+        top_products = db.session.query(
+            Product,
+            (Product.price * Product.quantity).label('total_value')
+        ).filter(Product.quantity > 0).order_by(
+            (Product.price * Product.quantity).desc()
+        ).limit(8).all()
+        
+        products_data = []
+        for product, value in top_products:
+            products_data.append({
+                'name': product.name,
+                'sku': product.sku,
+                'value': float(value),
+                'quantity': product.quantity,
+                'price': float(product.price)
+            })
+        
+        data = {
+            'labels': [p['sku'] for p in products_data],
+            'datasets': [{
+                'label': 'Inventory Value',
+                'data': [p['value'] for p in products_data],
+                'backgroundColor': '#3498db',
+                'borderColor': '#2c3e50',
+                'borderWidth': 1
+            }],
+            'products': products_data
+        }
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/charts/transaction_activity')
+def api_transaction_activity():
+    """API endpoint for transaction activity line chart data"""
+    try:
+        # Get period from query parameter (default 7 days)
+        period = int(request.args.get('period', 7))
+        start_date = datetime.utcnow() - timedelta(days=period)
+        
+        # Generate date labels
+        dates = []
+        date_labels = []
+        for i in range(period):
+            date = start_date + timedelta(days=i)
+            dates.append(date.date())
+            date_labels.append(date.strftime('%m/%d'))
+        
+        # Get transaction counts by date
+        total_transactions = []
+        increases = []
+        decreases = []
+        
+        for date in dates:
+            start_datetime = datetime.combine(date, datetime.min.time())
+            end_datetime = datetime.combine(date, datetime.max.time())
+            
+            # Total transactions for this date
+            day_total = StockTransaction.query.filter(
+                StockTransaction.created_at >= start_datetime,
+                StockTransaction.created_at <= end_datetime
+            ).count()
+            
+            # Increases for this date
+            day_increases = StockTransaction.query.filter(
+                StockTransaction.created_at >= start_datetime,
+                StockTransaction.created_at <= end_datetime,
+                StockTransaction.quantity_change > 0
+            ).count()
+            
+            # Decreases for this date
+            day_decreases = StockTransaction.query.filter(
+                StockTransaction.created_at >= start_datetime,
+                StockTransaction.created_at <= end_datetime,
+                StockTransaction.quantity_change < 0
+            ).count()
+            
+            total_transactions.append(day_total)
+            increases.append(day_increases)
+            decreases.append(day_decreases)
+        
+        data = {
+            'labels': date_labels,
+            'datasets': [
+                {
+                    'label': 'Total Transactions',
+                    'data': total_transactions,
+                    'borderColor': '#3498db',
+                    'backgroundColor': '#3498db20',
+                    'fill': True,
+                    'tension': 0.4
+                },
+                {
+                    'label': 'Stock Increases',
+                    'data': increases,
+                    'borderColor': '#27ae60',
+                    'backgroundColor': '#27ae6020',
+                    'fill': False,
+                    'tension': 0.4
+                },
+                {
+                    'label': 'Stock Decreases',
+                    'data': decreases,
+                    'borderColor': '#e74c3c',
+                    'backgroundColor': '#e74c3c20',
+                    'fill': False,
+                    'tension': 0.4
+                }
+            ]
+        }
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/charts/alert_distribution')
+def api_alert_distribution():
+    """API endpoint for alert severity distribution chart"""
+    try:
+        # Get alert counts by severity
+        alerts_query = db.session.query(ReorderPoint, Product).join(Product).filter(
+            ReorderPoint.is_active == True
+        )
+        
+        critical_count = alerts_query.filter(Product.quantity == 0).count()
+        urgent_count = alerts_query.filter(
+            Product.quantity > 0,
+            Product.quantity < ReorderPoint.minimum_quantity * 0.5
+        ).count()
+        warning_count = alerts_query.filter(
+            Product.quantity >= ReorderPoint.minimum_quantity * 0.5,
+            Product.quantity < ReorderPoint.minimum_quantity
+        ).count()
+        
+        # Calculate well-stocked products
+        total_products = Product.query.count()
+        total_alerts = critical_count + urgent_count + warning_count
+        well_stocked = total_products - total_alerts
+        
+        data = {
+            'labels': ['Well Stocked', 'Warning', 'Urgent', 'Critical'],
+            'datasets': [{
+                'data': [well_stocked, warning_count, urgent_count, critical_count],
+                'backgroundColor': ['#27ae60', '#f39c12', '#ff6b35', '#e74c3c'],
+                'borderWidth': 3,
+                'borderColor': '#ffffff'
+            }],
+            'details': {
+                'well_stocked': well_stocked,
+                'warning': warning_count,
+                'urgent': urgent_count,
+                'critical': critical_count,
+                'total': total_products
+            }
+        }
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/charts/supplier_performance')
+def api_supplier_performance():
+    """API endpoint for supplier performance horizontal bar chart"""
+    try:
+        # Get top suppliers by inventory value
+        suppliers_data = db.session.query(
+            Supplier, 
+            db.func.count(Product.id).label('product_count'),
+            db.func.sum(Product.quantity).label('total_stock'),
+            db.func.sum(Product.price * Product.quantity).label('total_value')
+        ).outerjoin(Product).group_by(Supplier.id).having(
+            db.func.count(Product.id) > 0
+        ).order_by(db.func.sum(Product.price * Product.quantity).desc()).limit(8).all()
+        
+        suppliers_list = []
+        for supplier, product_count, total_stock, total_value in suppliers_data:
+            suppliers_list.append({
+                'name': supplier.name,
+                'products': product_count,
+                'stock': total_stock or 0,
+                'value': float(total_value or 0)
+            })
+        
+        data = {
+            'labels': [s['name'] for s in suppliers_list],
+            'datasets': [{
+                'label': 'Inventory Value',
+                'data': [s['value'] for s in suppliers_list],
+                'backgroundColor': '#9b59b6',
+                'borderColor': '#2c3e50',
+                'borderWidth': 1
+            }],
+            'suppliers': suppliers_list
+        }
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/charts/inventory_value_trend')
+def api_inventory_value_trend():
+    """API endpoint for inventory value trend line chart"""
+    try:
+        # Get period from query parameter (default 7 days)
+        period = int(request.args.get('period', 7))
+        
+        # For this implementation, we'll calculate value trends based on transaction history
+        # In a more advanced system, you might store daily snapshots
+        
+        dates = []
+        date_labels = []
+        values = []
+        
+        current_value = float(db.session.query(db.func.sum(Product.price * Product.quantity)).scalar() or 0)
+        
+        for i in range(period):
+            date = datetime.utcnow() - timedelta(days=period - 1 - i)
+            dates.append(date.date())
+            date_labels.append(date.strftime('%m/%d'))
+            
+            # Calculate approximate value for this date by working backwards from current value
+            # This is a simplified approach - in production you might store daily value snapshots
+            days_from_now = period - 1 - i
+            if days_from_now == 0:
+                # Today's value
+                values.append(current_value)
+            else:
+                # Estimate historical value based on transaction changes since then
+                since_date = datetime.combine(date.date(), datetime.min.time())
+                
+                # Get all transactions since this date
+                transactions_since = StockTransaction.query.filter(
+                    StockTransaction.created_at >= since_date
+                ).all()
+                
+                # Calculate value changes
+                value_change = 0
+                for transaction in transactions_since:
+                    value_change += transaction.quantity_change * transaction.product.price
+                
+                estimated_value = current_value - value_change
+                values.append(max(0, estimated_value))  # Ensure non-negative
+        
+        data = {
+            'labels': date_labels,
+            'datasets': [{
+                'label': 'Total Inventory Value',
+                'data': values,
+                'borderColor': '#27ae60',
+                'backgroundColor': '#27ae6020',
+                'fill': True,
+                'tension': 0.4,
+                'pointBackgroundColor': '#27ae60',
+                'pointBorderColor': '#ffffff',
+                'pointBorderWidth': 2,
+                'pointRadius': 5
+            }]
+        }
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/charts/refresh_all')
+def api_refresh_all_charts():
+    """API endpoint to get all chart data at once"""
+    try:
+        # This endpoint returns all chart data in one request for efficiency
+        response_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'stock_distribution': api_stock_distribution().get_json(),
+            'top_products': api_top_products().get_json(),
+            'transaction_activity': api_transaction_activity().get_json(),
+            'alert_distribution': api_alert_distribution().get_json(),
+            'supplier_performance': api_supplier_performance().get_json(),
+            'inventory_value_trend': api_inventory_value_trend().get_json()
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Enhanced dashboard route with chart-ready data
+# This updates your existing dashboard route to include chart-optimized data
+@app.route('/dashboard')
+def dashboard():
+    """Enhanced analytics dashboard with interactive charts support"""
+    
+    # Basic inventory metrics (existing code)
+    total_products = Product.query.count()
+    total_suppliers = Supplier.query.count()
+    total_transactions = StockTransaction.query.count()
+    
+    # Stock status analysis
+    products_with_stock = Product.query.filter(Product.quantity > 0).count()
+    out_of_stock_products = Product.query.filter(Product.quantity == 0).count()
+    low_stock_products = Product.query.filter(Product.quantity > 0, Product.quantity < 10).count()
+    
+    # Calculate total inventory value
+    inventory_value_query = db.session.query(db.func.sum(Product.price * Product.quantity)).scalar()
+    total_inventory_value = inventory_value_query if inventory_value_query else 0.0
+    
+    # Alert analysis (existing code)
+    active_reorder_points = ReorderPoint.query.filter(ReorderPoint.is_active == True).count()
+    
+    # Get products below their reorder minimums
+    alerts_query = db.session.query(ReorderPoint, Product).join(Product).filter(
+        ReorderPoint.is_active == True,
+        Product.quantity < ReorderPoint.minimum_quantity
+    )
+    
+    critical_alerts_count = alerts_query.filter(Product.quantity == 0).count()
+    urgent_alerts_count = alerts_query.filter(
+        Product.quantity > 0,
+        Product.quantity < ReorderPoint.minimum_quantity * 0.5
+    ).count()
+    warning_alerts_count = alerts_query.filter(
+        Product.quantity >= ReorderPoint.minimum_quantity * 0.5,
+        Product.quantity < ReorderPoint.minimum_quantity
+    ).count()
+    
+    total_active_alerts = critical_alerts_count + urgent_alerts_count + warning_alerts_count
+    
+    # Recent transaction activity (existing code)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    
+    recent_transactions = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago
+    ).order_by(StockTransaction.created_at.desc()).limit(10).all()
+    
+    transactions_last_week = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago
+    ).count()
+    
+    # Stock movement analysis (existing code)
+    increases_last_week = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago,
+        StockTransaction.quantity_change > 0
+    ).count()
+    
+    decreases_last_week = StockTransaction.query.filter(
+        StockTransaction.created_at >= seven_days_ago,
+        StockTransaction.quantity_change < 0
+    ).count()
+    
+    # Top products by value (existing code)
+    top_products_by_value = db.session.query(
+        Product,
+        (Product.price * Product.quantity).label('total_value')
+    ).filter(Product.quantity > 0).order_by(
+        (Product.price * Product.quantity).desc()
+    ).limit(5).all()
+    
+    # Products requiring attention (existing code)
+    attention_products = db.session.query(Product).filter(
+        Product.quantity < 10,
+        Product.quantity > 0,
+        Product.price > 10.0
+    ).order_by((Product.price * Product.quantity).desc()).limit(5).all()
+    
+    # Supplier analysis (existing code)
+    suppliers_with_products = db.session.query(
+        Supplier, 
+        db.func.count(Product.id).label('product_count'),
+        db.func.sum(Product.quantity).label('total_stock'),
+        db.func.sum(Product.price * Product.quantity).label('total_value')
+    ).outerjoin(Product).group_by(Supplier.id).having(
+        db.func.count(Product.id) > 0
+    ).order_by(db.func.sum(Product.price * Product.quantity).desc()).limit(5).all()
+    
+    # Package all data for template (existing structure preserved)
+    dashboard_data = {
+        'metrics': {
+            'total_products': total_products,
+            'total_suppliers': total_suppliers,
+            'total_transactions': total_transactions,
+            'products_with_stock': products_with_stock,
+            'out_of_stock_products': out_of_stock_products,
+            'low_stock_products': low_stock_products,
+            'total_inventory_value': total_inventory_value,
+            'active_reorder_points': active_reorder_points
+        },
+        'alerts': {
+            'total_active_alerts': total_active_alerts,
+            'critical_alerts_count': critical_alerts_count,
+            'urgent_alerts_count': urgent_alerts_count,
+            'warning_alerts_count': warning_alerts_count
+        },
+        'activity': {
+            'transactions_last_week': transactions_last_week,
+            'increases_last_week': increases_last_week,
+            'decreases_last_week': decreases_last_week,
+            'recent_transactions': recent_transactions
+        },
+        'top_products': top_products_by_value,
+        'attention_products': attention_products,
+        'top_suppliers': suppliers_with_products,
+        # NEW: Chart-ready data included directly
+        'charts': {
+            'stock_distribution': {
+                'in_stock': products_with_stock,
+                'low_stock': low_stock_products,
+                'out_of_stock': out_of_stock_products
+            },
+            'top_products_count': len(top_products_by_value),
+            'suppliers_count': len(suppliers_with_products)
+        }
+    }
+    
+    return render_template('dashboard.html', data=dashboard_data)
+
+# Additional utility route for chart data validation
+@app.route('/api/charts/health')
+def api_charts_health():
+    """Health check endpoint for chart system"""
+    try:
+        health_data = {
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'database_connected': True,
+            'products_count': Product.query.count(),
+            'transactions_count': StockTransaction.query.count(),
+            'charts_available': [
+                'stock_distribution',
+                'top_products', 
+                'transaction_activity',
+                'alert_distribution',
+                'supplier_performance',
+                'inventory_value_trend'
+            ]
+        }
+        
+        return jsonify(health_data)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
 
 # Run the application
 if __name__ == '__main__':

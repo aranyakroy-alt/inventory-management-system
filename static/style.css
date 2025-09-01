@@ -795,3 +795,911 @@ body {
     background-color: #8e44ad;
     transform: scale(1.1);
 }
+
+/* Phase 5B: Enhanced CSS for Interactive Charts & Visualizations */
+/* Add these styles to your existing static/style.css file */
+
+/* ===== NAVIGATION ENHANCEMENTS ===== */
+.nav-active {
+    background-color: rgba(255,255,255,0.2) !important;
+    border-radius: 4px;
+}
+
+.btn-nav-primary {
+    background-color: #27ae60 !important;
+    color: white !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 20px !important;
+    font-weight: 500 !important;
+    transition: all 0.3s ease !important;
+}
+
+.btn-nav-primary:hover {
+    background-color: #229954 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+}
+
+/* ===== FLASH MESSAGES ENHANCEMENTS ===== */
+.flash {
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border-left: 4px solid;
+}
+
+.flash-success {
+    border-left-color: #27ae60;
+}
+
+.flash-error {
+    border-left-color: #e74c3c;
+}
+
+.flash-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-left-color: #3498db;
+}
+
+.flash::after {
+    content: '✕';
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    opacity: 0.6;
+    font-weight: bold;
+}
+
+.flash:hover::after {
+    opacity: 1;
+}
+
+/* ===== CHARTS SECTION STYLES ===== */
+.charts-section {
+    margin-bottom: 3rem;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.chart-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    position: relative;
+}
+
+.chart-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.chart-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+.chart-card:hover::before {
+    opacity: 1;
+}
+
+.chart-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.chart-header {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.chart-controls .form-control {
+    width: auto;
+    min-width: 130px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.chart-controls .form-control:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.chart-controls .btn-small {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.chart-controls .btn-small:hover {
+    transform: scale(1.05);
+}
+
+.chart-container {
+    padding: 2rem;
+    position: relative;
+    background: #fefefe;
+}
+
+.chart-container.large {
+    padding: 2rem 3rem;
+    min-height: 400px;
+}
+
+.chart-legend {
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    border-top: 1px solid #e9ecef;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* ===== CHART ERROR HANDLING STYLES ===== */
+.chart-error {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem;
+    text-align: center;
+    color: #7f8c8d;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 1rem;
+}
+
+.error-icon {
+    font-size: 2rem;
+    opacity: 0.6;
+}
+
+.error-message {
+    flex: 1;
+}
+
+.error-message strong {
+    color: #e74c3c;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+/* ===== CHART LOADING ANIMATIONS ===== */
+.chart-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #7f8c8d;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #ecf0f1;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===== ENHANCED METRIC CARDS WITH HOVER EFFECTS ===== */
+.metric-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.5s ease;
+}
+
+.metric-card:hover::after {
+    left: 100%;
+}
+
+/* ===== DASHBOARD ENHANCEMENTS ===== */
+.dashboard {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dashboard-header {
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===== ADVANCED BUTTON STYLES ===== */
+.btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50%;
+    transition: all 0.5s ease;
+    transform: translate(-50%, -50%);
+}
+
+.btn:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+/* ===== CHART SPECIFIC ENHANCEMENTS ===== */
+
+/* Stock Distribution Chart Enhancements */
+#stockDistributionChart {
+    transition: all 0.3s ease;
+}
+
+/* Top Products Chart Enhancements */
+#topProductsChart {
+    transition: all 0.3s ease;
+}
+
+/* Activity Chart Enhancements */
+#activityChart {
+    transition: all 0.3s ease;
+}
+
+/* Value Chart Enhancements */
+#valueChart {
+    transition: all 0.3s ease;
+}
+
+/* ===== RESPONSIVE CHART ADJUSTMENTS ===== */
+@media (max-width: 1200px) {
+    .charts-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .chart-card {
+        border-radius: 12px;
+    }
+    
+    .chart-card.full-width {
+        grid-column: 1;
+    }
+    
+    .chart-container {
+        padding: 1.5rem;
+        height: 280px;
+    }
+    
+    .chart-container.large {
+        height: 320px;
+        padding: 1.5rem;
+    }
+    
+    .chart-header {
+        padding: 1.25rem;
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .chart-controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .chart-controls .form-control {
+        min-width: 120px;
+        flex: 1;
+    }
+    
+    .chart-legend {
+        padding: 1rem;
+        gap: 1rem;
+    }
+    
+    .legend-item {
+        font-size: 0.85rem;
+    }
+    
+    .nav-container {
+        padding: 0 1rem;
+    }
+    
+    .nav-links {
+        gap: 1rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        padding: 1rem;
+        height: 250px;
+    }
+    
+    .chart-container.large {
+        height: 280px;
+    }
+    
+    .chart-header h3 {
+        font-size: 1rem;
+    }
+    
+    .nav-container {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    
+    .nav-links {
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+    }
+    
+    .nav-links li {
+        width: 100%;
+    }
+    
+    .nav-links a {
+        display: block;
+        width: 100%;
+        text-align: center;
+        padding: 0.75rem;
+    }
+}
+
+/* ===== ENHANCED TABLE STYLES FOR BETTER VISUAL HIERARCHY ===== */
+.products-table {
+    position: relative;
+}
+
+.products-table thead th {
+    position: sticky;
+    top: 0;
+    background: #2c3e50;
+    z-index: 10;
+}
+
+.products-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.products-table tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* ===== ENHANCED FORM CONTROLS ===== */
+.form-control:focus {
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    transform: scale(1.02);
+}
+
+.form-group {
+    position: relative;
+}
+
+.form-group label {
+    transition: all 0.3s ease;
+}
+
+.form-control:focus + label,
+.form-control:valid + label {
+    color: #3498db;
+    transform: translateY(-2px);
+}
+
+/* ===== ADVANCED ANIMATIONS FOR DASHBOARD ELEMENTS ===== */
+.metric-card {
+    animation: slideInUp 0.6s ease-out;
+    animation-fill-mode: both;
+}
+
+.metric-card:nth-child(1) { animation-delay: 0.1s; }
+.metric-card:nth-child(2) { animation-delay: 0.2s; }
+.metric-card:nth-child(3) { animation-delay: 0.3s; }
+.metric-card:nth-child(4) { animation-delay: 0.4s; }
+.metric-card:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chart-card {
+    animation: fadeInScale 0.8s ease-out;
+    animation-fill-mode: both;
+}
+
+.chart-card:nth-child(1) { animation-delay: 0.2s; }
+.chart-card:nth-child(2) { animation-delay: 0.4s; }
+.chart-card:nth-child(3) { animation-delay: 0.6s; }
+.chart-card:nth-child(4) { animation-delay: 0.8s; }
+.chart-card:nth-child(5) { animation-delay: 1.0s; }
+.chart-card:nth-child(6) { animation-delay: 1.2s; }
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ===== ENHANCED DASHBOARD GRID LAYOUTS ===== */
+.dashboard-grid {
+    animation: fadeIn 1s ease-out 0.5s;
+    animation-fill-mode: both;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ===== PROFESSIONAL TOOLTIP STYLES ===== */
+.tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(44, 62, 80, 0.95);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+}
+
+.tooltip:hover::before {
+    opacity: 1;
+}
+
+/* ===== ENHANCED LOADING STATES ===== */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ===== ENHANCED ALERT SUMMARY STYLES ===== */
+.alert-summary-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.alert-summary-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+    animation: slideRight 2s infinite;
+}
+
+@keyframes slideRight {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ===== ENHANCED ACTION BUTTONS ===== */
+.action-btn {
+    position: relative;
+    background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
+    border: none;
+    overflow: hidden;
+}
+
+.action-btn.primary {
+    --bg-start: #3498db;
+    --bg-end: #2980b9;
+}
+
+.action-btn.secondary {
+    --bg-start: #ecf0f1;
+    --bg-end: #d5dbdb;
+}
+
+.action-btn.warning {
+    --bg-start: #f39c12;
+    --bg-end: #e67e22;
+}
+
+.action-btn.info {
+    --bg-start: #9b59b6;
+    --bg-end: #8e44ad;
+}
+
+.action-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50%;
+    transition: all 0.6s ease;
+    transform: translate(-50%, -50%);
+}
+
+.action-btn:hover::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* ===== ENHANCED VISUAL FEEDBACK ===== */
+.btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+/* ===== DARK MODE SUPPORT (Optional) ===== */
+@media (prefers-color-scheme: dark) {
+    .chart-card {
+        background: #34495e;
+        border-color: #4a6741;
+    }
+    
+    .chart-header {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: #ecf0f1;
+        border-bottom-color: #4a6741;
+    }
+    
+    .chart-header h3 {
+        color: #ecf0f1;
+    }
+    
+    .chart-container {
+        background: #2c3e50;
+    }
+    
+    .chart-legend {
+        background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+        border-top-color: #4a6741;
+    }
+    
+    .legend-item {
+        color: #ecf0f1;
+    }
+}
+
+/* ===== PRINT STYLES FOR DASHBOARD ===== */
+@media print {
+    .nav-container,
+    .chart-controls,
+    .action-btn,
+    .btn {
+        display: none !important;
+    }
+    
+    .chart-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+    
+    .dashboard {
+        max-width: none;
+    }
+    
+    .charts-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    .chart-card.full-width {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
+.chart-card:focus-within {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
+.btn:focus-visible {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===== HIGH CONTRAST MODE SUPPORT ===== */
+@media (prefers-contrast: high) {
+    .chart-card {
+        border: 2px solid #000;
+    }
+    
+    .btn {
+        border: 2px solid #000;
+    }
+    
+    .metric-card {
+        border: 2px solid #000;
+    }
+}
+
+/* ===== ENHANCED VISUAL INDICATORS ===== */
+.status-indicator {
+    position: relative;
+    display: inline-block;
+}
+
+.status-indicator::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.critical::before {
+    background: #e74c3c;
+}
+
+.status-indicator.warning::before {
+    background: #f39c12;
+}
+
+.status-indicator.success::before {
+    background: #27ae60;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(0.8);
+        opacity: 1;
+    }
+}
+
+/* ===== ENHANCED PERFORMANCE OPTIMIZATIONS ===== */
+.chart-container canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* GPU acceleration for smooth animations */
+.chart-card,
+.metric-card,
+.dashboard-card {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* ===== CHART INTERACTION ENHANCEMENTS ===== */
+.chart-container:hover canvas {
+    filter: brightness(1.05);
+    transition: filter 0.3s ease;
+}
+
+/* ===== ENHANCED GRADIENT BACKGROUNDS ===== */
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 6s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* ===== PROFESSIONAL CARD HOVER EFFECTS ===== */
+.dashboard-card {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+.chart-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+}
+
+/* ===== ENHANCED FOCUS MANAGEMENT ===== */
+.focus-trap {
+    outline: none;
+}
+
+.focus-trap:focus-visible {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ===== UTILITY CLASSES FOR CHARTS ===== */
+.chart-success { color: #27ae60; }
+.chart-warning { color: #f39c12; }
+.chart-danger { color: #e74c3c; }
+.chart-info { color: #3498db; }
+.chart-secondary { color: #95a5a6; }
+
+.text-chart-success { color: #27ae60 !important; }
+.text-chart-warning { color: #f39c12 !important; }
+.text-chart-danger { color: #e74c3c !important; }
+.text-chart-info { color: #3498db !important; }
+
+.bg-chart-success { background-color: #27ae60 !important; }
+.bg-chart-warning { background-color: #f39c12 !important; }
+.bg-chart-danger { background-color: #e74c3c !important; }
+.bg-chart-info { background-color: #3498db !important; }
