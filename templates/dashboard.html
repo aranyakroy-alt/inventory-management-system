@@ -1,7 +1,4 @@
-# Phase 5B1: Enhanced dashboard.html with Chart.js Integration
-# This replaces templates/dashboard.html to add interactive charts
-
-dashboard_html_content = '''{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block content %}
 <div class="dashboard">
@@ -12,7 +9,7 @@ dashboard_html_content = '''{% extends "base.html" %}
         </div>
     </div>
 
-    <!-- Key Metrics Overview (Enhanced with Charts) -->
+    <!-- Key Metrics Overview -->
     <div class="metrics-grid">
         <div class="metric-card primary">
             <div class="metric-icon">📦</div>
@@ -73,15 +70,15 @@ dashboard_html_content = '''{% extends "base.html" %}
         </div>
     </div>
 
-    <!-- NEW: Interactive Charts Section -->
+    <!-- Interactive Charts Section -->
     <div class="charts-section">
         <div class="charts-grid">
-            <!-- Stock Distribution Pie Chart -->
+            <!-- Stock Distribution Chart -->
             <div class="chart-card">
                 <div class="chart-header">
                     <h3>📊 Stock Distribution</h3>
                     <div class="chart-controls">
-                        <button class="btn btn-small btn-secondary" onclick="refreshChart('stockDistribution')">🔄</button>
+                        <button class="btn btn-small btn-secondary" data-refresh-chart="stockDistribution">🔄</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -108,7 +105,7 @@ dashboard_html_content = '''{% extends "base.html" %}
                 <div class="chart-header">
                     <h3>💎 Top Products by Value</h3>
                     <div class="chart-controls">
-                        <button class="btn btn-small btn-secondary" onclick="refreshChart('topProducts')">🔄</button>
+                        <button class="btn btn-small btn-secondary" data-refresh-chart="topProducts">🔄</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -121,12 +118,12 @@ dashboard_html_content = '''{% extends "base.html" %}
                 <div class="chart-header">
                     <h3>📈 Transaction Activity Trends</h3>
                     <div class="chart-controls">
-                        <select id="activityPeriod" class="form-control" onchange="updateActivityChart()">
+                        <select id="activityPeriod" class="form-control">
                             <option value="7">Last 7 days</option>
                             <option value="14">Last 14 days</option>
                             <option value="30">Last 30 days</option>
                         </select>
-                        <button class="btn btn-small btn-secondary" onclick="refreshChart('activity')">🔄</button>
+                        <button class="btn btn-small btn-secondary" data-refresh-chart="activity">🔄</button>
                     </div>
                 </div>
                 <div class="chart-container large">
@@ -139,7 +136,7 @@ dashboard_html_content = '''{% extends "base.html" %}
                 <div class="chart-header">
                     <h3>⚠️ Alert Severity</h3>
                     <div class="chart-controls">
-                        <button class="btn btn-small btn-secondary" onclick="refreshChart('alerts')">🔄</button>
+                        <button class="btn btn-small btn-secondary" data-refresh-chart="alerts">🔄</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -152,7 +149,7 @@ dashboard_html_content = '''{% extends "base.html" %}
                 <div class="chart-header">
                     <h3>🏢 Supplier Performance</h3>
                     <div class="chart-controls">
-                        <button class="btn btn-small btn-secondary" onclick="refreshChart('suppliers')">🔄</button>
+                        <button class="btn btn-small btn-secondary" data-refresh-chart="suppliers">🔄</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -165,12 +162,12 @@ dashboard_html_content = '''{% extends "base.html" %}
                 <div class="chart-header">
                     <h3>💰 Inventory Value Trends</h3>
                     <div class="chart-controls">
-                        <select id="valuePeriod" class="form-control" onchange="updateValueChart()">
+                        <select id="valuePeriod" class="form-control">
                             <option value="7">Last 7 days</option>
                             <option value="14">Last 14 days</option>
                             <option value="30">Last 30 days</option>
                         </select>
-                        <button class="btn btn-small btn-secondary" onclick="refreshChart('value')">🔄</button>
+                        <button class="btn btn-small btn-secondary" data-refresh-chart="value">🔄</button>
                     </div>
                 </div>
                 <div class="chart-container large">
@@ -180,7 +177,7 @@ dashboard_html_content = '''{% extends "base.html" %}
         </div>
     </div>
 
-    <!-- Existing Content: Alert Summary and Quick Actions -->
+    <!-- Alert Summary Section -->
     {% if data.alerts.total_active_alerts > 0 %}
     <div class="dashboard-section">
         <div class="section-header">
@@ -414,490 +411,14 @@ dashboard_html_content = '''{% extends "base.html" %}
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- Include Chart.js from CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% block scripts %}
+<!-- Load Charts JavaScript -->
+<script src="{{ url_for('static', filename='charts.js') }}"></script>
 
-<!-- Chart Initialization and Management -->
-<script>
-// Global chart instances
-let stockDistributionChart;
-let topProductsChart;
-let activityChart;
-let alertsChart;
-let suppliersChart;
-let valueChart;
-
-// Chart color scheme matching your existing UI
-const chartColors = {
-    primary: '#3498db',
-    success: '#27ae60',
-    warning: '#f39c12',
-    danger: '#e74c3c',
-    info: '#9b59b6',
-    secondary: '#95a5a6',
-    light: '#ecf0f1',
-    dark: '#2c3e50'
-};
-
-// Initialize all charts when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    updateCurrentTime();
-    setInterval(updateCurrentTime, 60000); // Update time every minute
-    
-    initializeStockDistributionChart();
-    initializeTopProductsChart();
-    initializeActivityChart();
-    initializeAlertsChart();
-    initializeSuppliersChart();
-    initializeValueChart();
-});
-
-function updateCurrentTime() {
-    const now = new Date();
-    document.getElementById('currentTime').textContent = now.toLocaleString();
-}
-
-// Stock Distribution Pie Chart
-function initializeStockDistributionChart() {
-    const ctx = document.getElementById('stockDistributionChart').getContext('2d');
-    
-    const inStock = {{ data.metrics.products_with_stock }};
-    const lowStock = {{ data.metrics.low_stock_products }};
-    const outOfStock = {{ data.metrics.out_of_stock_products }};
-    
-    stockDistributionChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['In Stock', 'Low Stock', 'Out of Stock'],
-            datasets: [{
-                data: [inStock, lowStock, outOfStock],
-                backgroundColor: [chartColors.success, chartColors.warning, chartColors.danger],
-                borderWidth: 3,
-                borderColor: '#ffffff',
-                hoverBorderWidth: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false // We have custom legend
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const total = inStock + lowStock + outOfStock;
-                            const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-                            return `${context.label}: ${context.parsed} products (${percentage}%)`;
-                        }
-                    }
-                }
-            },
-            animation: {
-                animateRotate: true,
-                animateScale: true
-            }
-        }
-    });
-}
-
-// Top Products Bar Chart
-function initializeTopProductsChart() {
-    const ctx = document.getElementById('topProductsChart').getContext('2d');
-    
-    const topProducts = [
-        {% for product, value in data.top_products[:5] %}
-        {
-            name: "{{ product.name }}",
-            sku: "{{ product.sku }}",
-            value: {{ value }},
-            quantity: {{ product.quantity }},
-            price: {{ product.price }}
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
-    ];
-    
-    topProductsChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: topProducts.map(p => p.sku),
-            datasets: [{
-                label: 'Inventory Value',
-                data: topProducts.map(p => p.value),
-                backgroundColor: chartColors.primary,
-                borderColor: chartColors.dark,
-                borderWidth: 1,
-                borderRadius: 4,
-                borderSkipped: false,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(context) {
-                            const index = context[0].dataIndex;
-                            return topProducts[index].name;
-                        },
-                        label: function(context) {
-                            const index = context.dataIndex;
-                            const product = topProducts[index];
-                            return [
-                                `SKU: ${product.sku}`,
-                                `Quantity: ${product.quantity} units`,
-                                `Price: $${product.price.toFixed(2)}`,
-                                `Total Value: $${product.value.toFixed(2)}`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + value.toLocaleString();
-                        }
-                    }
-                },
-                x: {
-                    ticks: {
-                        maxRotation: 45
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Transaction Activity Line Chart
-function initializeActivityChart() {
-    const ctx = document.getElementById('activityChart').getContext('2d');
-    
-    // Generate sample data for last 7 days (in real app, this would come from backend)
-    const last7Days = [];
-    const transactionData = [];
-    const increaseData = [];
-    const decreaseData = [];
-    
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        last7Days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        
-        // Sample data (in real implementation, this would come from your transaction analysis)
-        transactionData.push(Math.floor(Math.random() * 10) + 1);
-        increaseData.push(Math.floor(Math.random() * 6) + 1);
-        decreaseData.push(Math.floor(Math.random() * 4) + 1);
-    }
-    
-    activityChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: last7Days,
-            datasets: [
-                {
-                    label: 'Total Transactions',
-                    data: transactionData,
-                    borderColor: chartColors.primary,
-                    backgroundColor: chartColors.primary + '20',
-                    fill: true,
-                    tension: 0.4
-                },
-                {
-                    label: 'Stock Increases',
-                    data: increaseData,
-                    borderColor: chartColors.success,
-                    backgroundColor: chartColors.success + '20',
-                    fill: false,
-                    tension: 0.4
-                },
-                {
-                    label: 'Stock Decreases',
-                    data: decreaseData,
-                    borderColor: chartColors.danger,
-                    backgroundColor: chartColors.danger + '20',
-                    fill: false,
-                    tension: 0.4
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    position: 'top'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            }
-        }
-    });
-}
-
-// Alert Level Distribution Chart
-function initializeAlertsChart() {
-    const ctx = document.getElementById('alertsChart').getContext('2d');
-    
-    const criticalAlerts = {{ data.alerts.critical_alerts_count }};
-    const urgentAlerts = {{ data.alerts.urgent_alerts_count }};
-    const warningAlerts = {{ data.alerts.warning_alerts_count }};
-    const okProducts = {{ data.metrics.total_products - data.alerts.total_active_alerts }};
-    
-    alertsChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Well Stocked', 'Warning', 'Urgent', 'Critical'],
-            datasets: [{
-                data: [okProducts, warningAlerts, urgentAlerts, criticalAlerts],
-                backgroundColor: [chartColors.success, chartColors.warning, '#ff6b35', chartColors.danger],
-                borderWidth: 3,
-                borderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const total = okProducts + warningAlerts + urgentAlerts + criticalAlerts;
-                            const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-                            return `${context.label}: ${context.parsed} products (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Supplier Performance Chart
-function initializeSuppliersChart() {
-    const ctx = document.getElementById('suppliersChart').getContext('2d');
-    
-    const suppliersData = [
-        {% for supplier, product_count, total_stock, total_value in data.top_suppliers[:5] %}
-        {
-            name: "{{ supplier.name }}",
-            products: {{ product_count }},
-            value: {{ total_value or 0 }}
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
-    ];
-    
-    suppliersChart = new Chart(ctx, {
-        type: 'horizontalBar',
-        data: {
-            labels: suppliersData.map(s => s.name),
-            datasets: [{
-                label: 'Inventory Value',
-                data: suppliersData.map(s => s.value),
-                backgroundColor: chartColors.info,
-                borderColor: chartColors.dark,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            indexAxis: 'y',
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const index = context.dataIndex;
-                            const supplier = suppliersData[index];
-                            return [
-                                `Inventory Value: $${supplier.value.toLocaleString()}`,
-                                `Products: ${supplier.products}`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + value.toLocaleString();
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Inventory Value Trend Chart
-function initializeValueChart() {
-    const ctx = document.getElementById('valueChart').getContext('2d');
-    
-    // Generate sample trend data (in real app, calculate from transactions)
-    const last7Days = [];
-    const valueData = [];
-    const baseValue = {{ data.metrics.total_inventory_value }};
-    
-    for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        last7Days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        
-        // Simulate value changes (in real implementation, calculate from historical transactions)
-        const variance = (Math.random() - 0.5) * 0.1; // ±5% variance
-        valueData.push(baseValue * (1 + variance * i * 0.1));
-    }
-    
-    valueChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: last7Days,
-            datasets: [{
-                label: 'Total Inventory Value',
-                data: valueData,
-                borderColor: chartColors.success,
-                backgroundColor: chartColors.success + '20',
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: chartColors.success,
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
-                pointRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `Total Value: $${context.parsed.y.toLocaleString()}`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + value.toLocaleString();
-                        }
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            }
-        }
-    });
-}
-
-// Chart refresh functions
-function refreshChart(chartType) {
-    // In a real implementation, this would fetch fresh data from the server
-    switch(chartType) {
-        case 'stockDistribution':
-            if (stockDistributionChart) {
-                stockDistributionChart.update('active');
-            }
-            break;
-        case 'topProducts':
-            if (topProductsChart) {
-                topProductsChart.update('active');
-            }
-            break;
-        case 'activity':
-            if (activityChart) {
-                activityChart.update('active');
-            }
-            break;
-        case 'alerts':
-            if (alertsChart) {
-                alertsChart.update('active');
-            }
-            break;
-        case 'suppliers':
-            if (suppliersChart) {
-                suppliersChart.update('active');
-            }
-            break;
-        case 'value':
-            if (valueChart) {
-                valueChart.update('active');
-            }
-            break;
-    }
-    
-    // Show refresh feedback
-    const button = event.target;
-    const originalText = button.innerHTML;
-    button.innerHTML = '✅';
-    button.disabled = true;
-    
-    setTimeout(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }, 1000);
-}
-
-function updateActivityChart() {
-    // This would fetch data for the selected period
-    console.log('Updating activity chart for period:', document.getElementById('activityPeriod').value);
-    // For now, just refresh the existing chart
-    if (activityChart) {
-        activityChart.update('active');
-    }
-}
-
-function updateValueChart() {
-    // This would fetch data for the selected period
-    console.log('Updating value chart for period:', document.getElementById('valuePeriod').value);
-    // For now, just refresh the existing chart
-    if (valueChart) {
-        valueChart.update('active');
-    }
-}
-</script>
-
+<!-- Dashboard-specific Chart Styling -->
 <style>
-/* Existing dashboard styles (preserve all your current dashboard.html styles) */
 .dashboard {
     max-width: 1400px;
     margin: 0 auto;
@@ -925,7 +446,7 @@ function updateValueChart() {
     opacity: 0.9;
 }
 
-/* Metrics Grid (existing styles) */
+/* Metrics Grid */
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -982,101 +503,7 @@ function updateValueChart() {
     line-height: 1.3;
 }
 
-/* NEW: Charts Section Styles */
-.charts-section {
-    margin-bottom: 3rem;
-}
-
-.charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 2rem;
-}
-
-.chart-card {
-    background: white;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    overflow: hidden;
-    transition: all 0.3s ease;
-    border: 1px solid #e9ecef;
-}
-
-.chart-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-}
-
-.chart-card.full-width {
-    grid-column: 1 / -1;
-    min-height: 400px;
-}
-
-.chart-header {
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.chart-header h3 {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-.chart-controls {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.chart-controls .form-control {
-    width: auto;
-    min-width: 120px;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-}
-
-.chart-container {
-    padding: 2rem;
-    height: 300px;
-    position: relative;
-}
-
-.chart-container.large {
-    height: 400px;
-}
-
-.chart-legend {
-    padding: 1rem 2rem;
-    background: #f8f9fa;
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    color: #2c3e50;
-}
-
-.legend-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-}
-
-/* Dashboard Sections (existing styles preserved) */
+/* Dashboard Sections */
 .dashboard-section {
     background: white;
     border-radius: 12px;
@@ -1097,7 +524,7 @@ function updateValueChart() {
     color: #2c3e50;
 }
 
-/* Alert Summary (existing styles) */
+/* Alert Summary */
 .alert-summary {
     display: flex;
     gap: 1rem;
@@ -1127,7 +554,7 @@ function updateValueChart() {
     font-weight: 500;
 }
 
-/* Dashboard Grid (existing styles) */
+/* Dashboard Grid */
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -1147,7 +574,6 @@ function updateValueChart() {
     box-shadow: 0 4px 20px rgba(0,0,0,0.12);
 }
 
-/* Featured Card for Reports */
 .featured-card {
     border: 2px solid #3498db;
     box-shadow: 0 4px 15px rgba(52, 152, 219, 0.15);
@@ -1167,10 +593,6 @@ function updateValueChart() {
     color: white;
 }
 
-.featured-card .view-all-link {
-    color: rgba(255, 255, 255, 0.9);
-}
-
 .card-header h3 {
     margin: 0;
     color: #2c3e50;
@@ -1188,11 +610,15 @@ function updateValueChart() {
     font-weight: 500;
 }
 
+.featured-card .view-all-link {
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .card-content {
     padding: 1.25rem;
 }
 
-/* All other existing styles preserved... */
+/* List Items */
 .ranking-list,
 .attention-list,
 .supplier-list,
@@ -1486,21 +912,23 @@ function updateValueChart() {
         text-align: center;
         gap: 0.75rem;
     }
-    
-    .chart-controls {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    
-    .chart-container {
-        padding: 1rem;
-        height: 250px;
-    }
-    
-    .chart-container.large {
-        height: 300px;
-    }
 }
 </style>
-{% endblock %}'''
 
+<!-- Initialize charts with current time update -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update current time
+    function updateCurrentTime() {
+        const now = new Date();
+        const timeElement = document.getElementById('currentTime');
+        if (timeElement) {
+            timeElement.textContent = now.toLocaleString();
+        }
+    }
+    
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 60000); // Update every minute
+});
+</script>
+{% endblock %}

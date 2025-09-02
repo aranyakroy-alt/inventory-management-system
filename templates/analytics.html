@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="analytics-dashboard">
+    <div class="dashboard-header">
+        <h2>Advanced Business Intelligence Analytics</h2>
+        <div class="last-updated">
+            <small>Updated: <span id="analyticsTime"></span></small>
+            <button class="btn btn-secondary" onclick="refreshAllAnalytics()">🔄 Refresh All</button>
+        </div>
+    </div>
+
+    <!-- Business Intelligence KPIs -->
+    <div class="analytics-section">
+        <h3>📊 Business Intelligence Overview</h3>
+        <div class="kpi-grid" id="biKpis">
+            <div class="kpi-card loading">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Performance Summary -->
+    <div class="analytics-section">
+        <h3>⚡ System Performance</h3>
+        <div class="performance-grid" id="performanceKpis">
+            <div class="performance-card loading">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Demand Forecasting -->
+    <div class="analytics-section">
+        <h3>🔮 Demand Forecast</h3>
+        <div class="forecast-container" id="demandForecast">
+            <div class="forecast-loading">Loading forecast data...</div>
+        </div>
+    </div>
+
+    <!-- Supplier Risk Assessment -->
+    <div class="analytics-section">
+        <h3>🏢 Supplier Risk Assessment</h3>
+        <div class="risk-container" id="supplierRisk">
+            <div class="risk-loading">Loading risk assessment...</div>
+        </div>
+    </div>
+
+    <!-- Inventory Optimization -->
+    <div class="analytics-section">
+        <h3>⚙️ Inventory Optimization</h3>
+        <div class="optimization-container" id="inventoryOptimization">
+            <div class="optimization-loading">Loading optimization data...</div>
+        </div>
+    </div>
+
+    <!-- Recommendations Panel -->
+    <div class="recommendations-section">
+        <h3>💡 Executive Recommendations</h3>
+        <div class="recommendations-list" id="executiveRecommendations">
+            <div class="recommendations-loading">Loading recommendations...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.analytics-dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.analytics-section {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border-left: 4px solid #3498db;
+}
+
+.analytics-section h3 {
+    margin-bottom: 1.5rem;
+    color: #2c3e50;
+    font-size: 1.3rem;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.kpi-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+.kpi-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-label {
+    font-size: 1rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-status {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.kpi-status.excellent { background: #d4edda; color: #155724; }
+.kpi-status.good { background: #cce5ff; color: #004085; }
+.kpi-status.fair { background: #fff3cd; color: #856404; }
+.kpi-status.poor { background: #f8d7da; color: #721c24; }
+
+.performance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.performance-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border-left: 4px solid #28a745;
+}
+
+.performance-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.metric-name {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.metric-value {
+    font-weight: bold;
+    color: #28a745;
+}
+
+.forecast-container,
+.risk-container,
+.optimization-container {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    min-height: 200px;
+}
+
+.forecast-item,
+.risk-item,
+.optimization-item {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #007bff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.item-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+}
+
+.item-info p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.risk-high { border-left-color: #dc3545; }
+.risk-medium { border-left-color: #ffc107; }
+.risk-low { border-left-color: #28a745; }
+
+.recommendations-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.recommendations-section h3 {
+    color: white;
+    margin-bottom: 1.5rem;
+}
+
+.recommendation-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.recommendation-priority {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+}
+
+.priority-high { background: rgba(220, 53, 69, 0.8); }
+.priority-medium { background: rgba(255, 193, 7, 0.8); }
+.priority-low { background: rgba(40, 167, 69, 0.8); }
+.priority-info { background: rgba(23, 162, 184, 0.8); }
+
+.recommendation-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+}
+
+.recommendation-action {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    font-style: italic;
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+@media (max-width: 768px) {
+    .analytics-dashboard {
+        padding: 1rem;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .kpi-grid,
+    .performance-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .forecast-item,
+    .risk-item,
+    .optimization-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+</style>
+
+<script>
+// Analytics Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    updateAnalyticsTime();
+    loadAllAnalytics();
+    
+    // Auto-refresh every 10 minutes
+    setInterval(loadAllAnalytics, 600000);
+});
+
+function updateAnalyticsTime() {
+    const now = new Date();
+    const timeElement = document.getElementById('analyticsTime');
+    if (timeElement) {
+        timeElement.textContent = now.toLocaleString();
+    }
+}
+
+async function loadAllAnalytics() {
+    updateAnalyticsTime();
+    
+    try {
+        await Promise.all([
+            loadBusinessIntelligence(),
+            loadPerformanceSummary(),
+            loadDemandForecast(),
+            loadSupplierRisk(),
+            loadInventoryOptimization()
+        ]);
+        console.log('All analytics loaded successfully');
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+    }
+}
+
+async function loadBusinessIntelligence() {
+    try {
+        const response = await fetch('/api/analytics/business_intelligence');
+        const data = await response.json();
+        
+        const kpisContainer = document.getElementById('biKpis');
+        kpisContainer.innerHTML = `
+            <div class="kpi-card">
+                <div class="kpi-value">${data.inventory_health.score}%</div>
+                <div class="kpi-label">Inventory Health Score</div>
+                <div class="kpi-status ${data.inventory_health.status.toLowerCase()}">${data.inventory_health.status}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">$${data.financial_performance.total_value.toLocaleString()}</div>
+                <div class="kpi-label">Total Inventory Value</div>
+                <div class="kpi-status good">${data.financial_performance.high_value_products} High Value Products</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">${data.supplier_metrics.utilization_rate}%</div>
+                <div class="kpi-label">Supplier Utilization</div>
+                <div class="kpi-status ${data.supplier_metrics.utilization_rate > 80 ? 'excellent' : 'good'}">${data.supplier_metrics.diversification_status}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">${data.operational_efficiency.transaction_velocity}</div>
+                <div class="kpi-label">Daily Transaction Rate</div>
+                <div class="kpi-status ${data.operational_efficiency.efficiency_status.toLowerCase()}">${data.operational_efficiency.efficiency_status} Efficiency</div>
+            </div>
+        `;
+        
+        // Load recommendations
+        displayRecommendations(data.recommendations);
+        
+    } catch (error) {
+        console.error('Error loading business intelligence:', error);
+        document.getElementById('biKpis').innerHTML = '<div class="error">Failed to load BI data</div>';
+    }
+}
+
+async function loadPerformanceSummary() {
+    try {
+        const response = await fetch('/api/analytics/performance_summary');
+        const data = await response.json();
+        
+        const performanceContainer = document.getElementById('performanceKpis');
+        performanceContainer.innerHTML = `
+            <div class="performance-card">
+                <div class="performance-metric">
+                    <span class="metric-name">System Health Score</span>
+                    <span class="metric-value">${data.system_health.overall_score}/100</span>
+                </div>
+                <div class="performance-metric">
+                    <span class="metric-name">Product Utilization</span>
+                    <span class="metric-value">${data.operational_metrics.product_utilization}%</span>
+                </div>
+                <div class="performance-metric">
+                    <span class="metric-name">Alert Effectiveness</span>
+                    <span class="metric-value">${data.operational_metrics.alert_effectiveness}%</span>
+                </div>
+            </div>
+            <div class="performance-card">
+                <div class="performance-metric">
+                    <span class="metric-name">Active Products</span>
+                    <span class="metric-value">${data.operational_metrics.active_products}</span>
+                </div>
+                <div class="performance-metric">
+                    <span class="metric-name">Active Suppliers</span>
+                    <span class="metric-value">${data.supplier_metrics.active_suppliers}</span>
+                </div>
+                <div class="performance-metric">
+                    <span class="metric-name">Monthly Value Change</span>
+                    <span class="metric-value ${data.financial_metrics.monthly_value_change >= 0 ? 'positive' : 'negative'}">
+                        $${data.financial_metrics.monthly_value_change.toLocaleString()}
+                    </span>
+                </div>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading performance summary:', error);
+    }
+}
+
+async function loadDemandForecast() {
+    try {
+        const response = await fetch('/api/analytics/demand_forecast');
+        const data = await response.json();
+        
+        const forecastContainer = document.getElementById('demandForecast');
+        
+        if (data.forecasts.length === 0) {
+            forecastContainer.innerHTML = '<div class="forecast-item"><p>No forecast data available - need more transaction history</p></div>';
+            return;
+        }
+        
+        const forecastHTML = data.forecasts.map(forecast => `
+            <div class="forecast-item risk-${forecast.risk_level}">
+                <div class="item-info">
+                    <h4>${forecast.product_name} (${forecast.sku})</h4>
+                    <p>Current Stock: ${forecast.current_stock} | Daily Demand: ${forecast.daily_demand_rate}</p>
+                    <p>Forecasted Demand (30 days): ${forecast.forecasted_demand} units</p>
+                    ${forecast.days_until_stockout ? `<p><strong>Days Until Stockout: ${forecast.days_until_stockout}</strong></p>` : ''}
+                </div>
+                <div class="forecast-risk">
+                    <span class="risk-badge ${forecast.risk_level}">${forecast.risk_level.toUpperCase()} RISK</span>
+                </div>
+            </div>
+        `).join('');
+        
+        forecastContainer.innerHTML = `
+            <div class="forecast-summary">
+                <h4>Forecast Summary</h4>
+                <p>Products Analyzed: ${data.products_analyzed} | High Risk Products: ${data.high_risk_products}</p>
+            </div>
+            ${forecastHTML}
+        `;
+        
+    } catch (error) {
+        console.error('Error loading demand forecast:', error);
+    }
+}
+
+async function loadSupplierRisk() {
+    try {
+        const response = await fetch('/api/analytics/supplier_risk_assessment');
+        const data = await response.json();
+        
+        const riskContainer = document.getElementById('supplierRisk');
+        
+        const riskHTML = data.supplier_assessments.slice(0, 5).map(supplier => `
+            <div class="risk-item risk-${supplier.risk_level}">
+                <div class="item-info">
+                    <h4>${supplier.supplier_name}</h4>
+                    <p>Products: ${supplier.product_count} | Value: $${supplier.total_value.toLocaleString()}</p>
+                    <p>Risk Score: ${supplier.risk_score}/100 | Concentration: ${supplier.value_concentration}%</p>
+                </div>
+                <div class="risk-level">
+                    <span class="risk-badge ${supplier.risk_level}">${supplier.risk_level.toUpperCase()}</span>
+                </div>
+            </div>
+        `).join('');
+        
+        riskContainer.innerHTML = `
+            <div class="risk-summary">
+                <h4>Risk Assessment Summary</h4>
+                <p>High Risk: ${data.high_risk_suppliers} | Medium Risk: ${data.medium_risk_suppliers} | Low Risk: ${data.low_risk_suppliers}</p>
+                <p><strong>Diversification:</strong> ${data.portfolio_insights.diversification_recommendation}</p>
+            </div>
+            ${riskHTML}
+        `;
+        
+    } catch (error) {
+        console.error('Error loading supplier risk:', error);
+    }
+}
+
+async function loadInventoryOptimization() {
+    try {
+        const response = await fetch('/api/analytics/inventory_optimization');
+        const data = await response.json();
+        
+        const optimizationContainer = document.getElementById('inventoryOptimization');
+        
+        const optimizationHTML = data.optimization_opportunities.slice(0, 5).map(item => `
+            <div class="optimization-item">
+                <div class="item-info">
+                    <h4>${item.product_name} (${item.sku})</h4>
+                    <p>Current: ${item.current_stock} | Optimal: ${item.optimal_stock_level} | Efficiency: ${item.stock_efficiency}</p>
+                    <p>Value Velocity: $${item.value_velocity}/day</p>
+                </div>
+                <div class="optimization-score">
+                    <span class="score-badge">${item.optimization_score}/100</span>
+                </div>
+            </div>
+        `).join('');
+        
+        optimizationContainer.innerHTML = `
+            <div class="optimization-summary">
+                <h4>Optimization Summary</h4>
+                <p>Critical: ${data.summary.needs_immediate_attention} | Needs Monitoring: ${data.summary.needs_monitoring}</p>
+                <p>Well Optimized: ${data.summary.well_optimized} | No Monitoring: ${data.summary.no_monitoring}</p>
+            </div>
+            ${optimizationHTML}
+        `;
+        
+    } catch (error) {
+        console.error('Error loading inventory optimization:', error);
+    }
+}
+
+function displayRecommendations(recommendations) {
+    const recommendationsContainer = document.getElementById('executiveRecommendations');
+    
+    const recommendationsHTML = recommendations.map(rec => `
+        <div class="recommendation-item">
+            <div class="recommendation-priority priority-${rec.priority}">${rec.priority} Priority</div>
+            <div class="recommendation-text">${rec.message}</div>
+            <div class="recommendation-action"><strong>Action:</strong> ${rec.action}</div>
+        </div>
+    `).join('');
+    
+    recommendationsContainer.innerHTML = recommendationsHTML;
+}
+
+function refreshAllAnalytics() {
+    const button = event.target;
+    button.disabled = true;
+    button.innerHTML = '⏳ Refreshing...';
+    
+    loadAllAnalytics().then(() => {
+        button.innerHTML = '✅ Updated';
+        setTimeout(() => {
+            button.innerHTML = '🔄 Refresh All';
+            button.disabled = false;
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

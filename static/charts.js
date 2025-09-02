@@ -1,5 +1,5 @@
-// Phase 5B5: Advanced Chart Management System
-// Create this as static/charts.js for comprehensive chart functionality
+// Phase 5 Consolidated: Advanced Chart Management System with Real-Time API Integration
+// File: static/charts.js
 
 class InventoryChartsManager {
     constructor() {
@@ -23,6 +23,8 @@ class InventoryChartsManager {
         
         this.isInitialized = false;
         this.updateInterval = null;
+        this.retryCount = {};
+        this.maxRetries = 3;
     }
 
     // Initialize all charts when dashboard loads
@@ -30,7 +32,6 @@ class InventoryChartsManager {
         try {
             console.log('🚀 Initializing Inventory Charts Manager...');
             
-            // Wait for DOM to be ready
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => this.initializeCharts());
             } else {
@@ -46,29 +47,44 @@ class InventoryChartsManager {
     }
 
     async initializeCharts() {
-        // Initialize each chart with error handling
-        await this.initStockDistributionChart();
-        await this.initTopProductsChart();
-        await this.initActivityTrendChart();
-        await this.initAlertDistributionChart();
-        await this.initSupplierPerformanceChart();
-        await this.initInventoryValueChart();
+        // Initialize each chart with comprehensive error handling
+        const initPromises = [
+            this.initStockDistributionChart(),
+            this.initTopProductsChart(),
+            this.initActivityTrendChart(),
+            this.initAlertDistributionChart(),
+            this.initSupplierPerformanceChart(),
+            this.initInventoryValueChart()
+        ];
+
+        // Initialize charts concurrently but handle errors gracefully
+        const results = await Promise.allSettled(initPromises);
         
-        // Setup auto-refresh for real-time updates
+        let successCount = 0;
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                successCount++;
+            } else {
+                console.error(`Chart ${index} failed to initialize:`, result.reason);
+            }
+        });
+
+        console.log(`📊 Charts initialized: ${successCount}/${results.length} successful`);
+        
+        // Setup additional features
         this.setupAutoRefresh();
-        
-        // Setup event listeners
         this.setupEventListeners();
+        this.setupKeyboardShortcuts();
     }
 
-    // Stock Distribution Pie Chart with Enhanced Interactivity
+    // Stock Distribution Chart with Enhanced API Integration
     async initStockDistributionChart() {
         try {
             const ctx = document.getElementById('stockDistributionChart');
             if (!ctx) return;
 
-            const response = await fetch('/api/charts/stock_distribution');
-            const data = await response.json();
+            const data = await this.fetchChartData('/api/charts/stock_distribution');
+            if (!data) throw new Error('Failed to fetch stock distribution data');
 
             this.charts.stockDistribution = new Chart(ctx, {
                 type: 'doughnut',
@@ -93,7 +109,7 @@ class InventoryChartsManager {
                     cutout: '60%',
                     plugins: {
                         legend: {
-                            display: false // Using custom legend
+                            display: false
                         },
                         tooltip: {
                             callbacks: {
@@ -131,14 +147,14 @@ class InventoryChartsManager {
         }
     }
 
-    // Top Products Bar Chart with Drill-Down Capability
+    // Top Products Chart with Real-Time API Data
     async initTopProductsChart() {
         try {
             const ctx = document.getElementById('topProductsChart');
             if (!ctx) return;
 
-            const response = await fetch('/api/charts/top_products');
-            const data = await response.json();
+            const data = await this.fetchChartData('/api/charts/top_products');
+            if (!data) throw new Error('Failed to fetch top products data');
 
             this.charts.topProducts = new Chart(ctx, {
                 type: 'bar',
@@ -147,7 +163,7 @@ class InventoryChartsManager {
                     datasets: [{
                         label: 'Inventory Value',
                         data: data.datasets[0].data,
-                        backgroundColor: this.createGradient(ctx, this.chartConfig.colors.primary),
+                        backgroundColor: '#3498db', // Use solid color instead of gradient for now
                         borderColor: this.chartConfig.colors.dark,
                         borderWidth: 1,
                         borderRadius: 6,
@@ -227,15 +243,15 @@ class InventoryChartsManager {
         }
     }
 
-    // Transaction Activity Line Chart with Time Period Selection
+    // Transaction Activity Chart with API Integration
     async initActivityTrendChart() {
         try {
             const ctx = document.getElementById('activityChart');
             if (!ctx) return;
 
             const period = document.getElementById('activityPeriod')?.value || 7;
-            const response = await fetch(`/api/charts/transaction_activity?period=${period}`);
-            const data = await response.json();
+            const data = await this.fetchChartData(`/api/charts/transaction_activity?period=${period}`);
+            if (!data) throw new Error('Failed to fetch activity data');
 
             this.charts.activity = new Chart(ctx, {
                 type: 'line',
@@ -314,14 +330,14 @@ class InventoryChartsManager {
         }
     }
 
-    // Alert Distribution Doughnut Chart
+    // Alert Distribution Chart with API Integration
     async initAlertDistributionChart() {
         try {
             const ctx = document.getElementById('alertsChart');
             if (!ctx) return;
 
-            const response = await fetch('/api/charts/alert_distribution');
-            const data = await response.json();
+            const data = await this.fetchChartData('/api/charts/alert_distribution');
+            if (!data) throw new Error('Failed to fetch alert data');
 
             this.charts.alerts = new Chart(ctx, {
                 type: 'doughnut',
@@ -379,14 +395,14 @@ class InventoryChartsManager {
         }
     }
 
-    // Supplier Performance Horizontal Bar Chart
+    // Supplier Performance Chart with API Integration
     async initSupplierPerformanceChart() {
         try {
             const ctx = document.getElementById('suppliersChart');
             if (!ctx) return;
 
-            const response = await fetch('/api/charts/supplier_performance');
-            const data = await response.json();
+            const data = await this.fetchChartData('/api/charts/supplier_performance');
+            if (!data) throw new Error('Failed to fetch supplier data');
 
             this.charts.suppliers = new Chart(ctx, {
                 type: 'bar',
@@ -395,7 +411,7 @@ class InventoryChartsManager {
                     datasets: [{
                         label: 'Inventory Value',
                         data: data.datasets[0].data,
-                        backgroundColor: this.createGradient(ctx, this.chartConfig.colors.info),
+                        backgroundColor: this.chartConfig.colors.info, // Use solid color instead of gradient
                         borderColor: this.chartConfig.colors.dark,
                         borderWidth: 1,
                         borderRadius: 4,
@@ -459,15 +475,15 @@ class InventoryChartsManager {
         }
     }
 
-    // Inventory Value Trend Line Chart with Period Selection
+    // Inventory Value Trend Chart with API Integration  
     async initInventoryValueChart() {
         try {
             const ctx = document.getElementById('valueChart');
             if (!ctx) return;
 
             const period = document.getElementById('valuePeriod')?.value || 7;
-            const response = await fetch(`/api/charts/inventory_value_trend?period=${period}`);
-            const data = await response.json();
+            const data = await this.fetchChartData(`/api/charts/inventory_value_trend?period=${period}`);
+            if (!data) throw new Error('Failed to fetch value trend data');
 
             this.charts.value = new Chart(ctx, {
                 type: 'line',
@@ -477,7 +493,7 @@ class InventoryChartsManager {
                         label: data.datasets[0].label,
                         data: data.datasets[0].data,
                         borderColor: this.chartConfig.colors.success,
-                        backgroundColor: this.createGradient(ctx, this.chartConfig.colors.success, true),
+                        backgroundColor: this.chartConfig.colors.success + '20', // Use hex opacity instead of gradient
                         fill: true,
                         tension: 0.4,
                         pointBackgroundColor: this.chartConfig.colors.success,
@@ -533,7 +549,7 @@ class InventoryChartsManager {
         }
     }
 
-    // Enhanced Chart Refresh with Real-Time Data
+    // Enhanced Chart Refresh with Retry Logic
     async refreshChart(chartName) {
         try {
             const chart = this.charts[chartName];
@@ -544,7 +560,6 @@ class InventoryChartsManager {
 
             console.log(`🔄 Refreshing ${chartName} chart...`);
             
-            // Show loading state
             this.showChartLoading(chartName);
             
             let apiEndpoint;
@@ -573,28 +588,27 @@ class InventoryChartsManager {
                     throw new Error(`Unknown chart type: ${chartName}`);
             }
 
-            const response = await fetch(apiEndpoint);
-            const newData = await response.json();
+            const newData = await this.fetchChartData(apiEndpoint);
+            if (!newData) throw new Error('Failed to fetch updated data');
 
-            // Update chart data
+            // Update chart data with smooth animation
             chart.data.labels = newData.labels;
             chart.data.datasets = newData.datasets;
             chart.update('active');
 
-            // Hide loading state
             this.hideChartLoading(chartName);
+            this.resetRetryCount(chartName);
             
             console.log(`✅ ${chartName} chart refreshed successfully`);
             
         } catch (error) {
             console.error(`❌ Error refreshing ${chartName} chart:`, error);
-            this.hideChartLoading(chartName);
+            this.handleChartRefreshError(chartName, error);
         }
     }
 
-    // Auto-refresh setup for real-time updates
+    // Auto-refresh with intelligent intervals
     setupAutoRefresh() {
-        // Auto-refresh every 5 minutes
         this.updateInterval = setInterval(() => {
             this.refreshAllCharts();
         }, 300000); // 5 minutes
@@ -609,14 +623,43 @@ class InventoryChartsManager {
         const refreshPromises = chartNames.map(name => this.refreshChart(name));
         
         try {
-            await Promise.all(refreshPromises);
-            console.log('✅ All charts refreshed successfully');
-            
-            // Show success notification
+            await Promise.allSettled(refreshPromises);
+            console.log('✅ All charts refresh completed');
             this.showNotification('Charts updated with latest data', 'success');
         } catch (error) {
-            console.error('❌ Error refreshing charts:', error);
+            console.error('❌ Error during bulk refresh:', error);
             this.showNotification('Some charts failed to update', 'error');
+        }
+    }
+
+    // Enhanced API data fetching with retry logic
+    async fetchChartData(endpoint) {
+        const retryKey = endpoint;
+        this.retryCount[retryKey] = this.retryCount[retryKey] || 0;
+
+        try {
+            const response = await fetch(endpoint);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.retryCount[retryKey] = 0; // Reset on success
+            return data;
+            
+        } catch (error) {
+            console.error(`Error fetching data from ${endpoint}:`, error);
+            
+            if (this.retryCount[retryKey] < this.maxRetries) {
+                this.retryCount[retryKey]++;
+                console.log(`🔄 Retrying ${endpoint} (attempt ${this.retryCount[retryKey]}/${this.maxRetries})`);
+                
+                // Exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount[retryKey]));
+                return this.fetchChartData(endpoint);
+            }
+            
+            return null;
         }
     }
 
@@ -624,7 +667,6 @@ class InventoryChartsManager {
     handleStockDistributionClick(stockStatus) {
         console.log(`📊 Stock distribution clicked: ${stockStatus}`);
         
-        // Navigate to filtered products view
         let filterParam;
         switch(stockStatus.toLowerCase()) {
             case 'in stock':
@@ -646,9 +688,7 @@ class InventoryChartsManager {
     handleProductClick(product) {
         console.log(`📦 Product clicked: ${product.name}`);
         
-        // Show product details modal or navigate to product page
         if (confirm(`View details for "${product.name}"?\n\nSKU: ${product.sku}\nCurrent Stock: ${product.quantity}\nValue: ${this.formatCurrency(product.value)}`)) {
-            // In a real implementation, you might open a modal or navigate to product details
             window.location.href = `/products?search=${product.sku}`;
         }
     }
@@ -657,7 +697,6 @@ class InventoryChartsManager {
         console.log(`⚠️ Alert level clicked: ${alertLevel}`);
         
         if (alertLevel.toLowerCase() !== 'well stocked') {
-            // Navigate to alerts dashboard
             window.location.href = '/alerts';
         }
     }
@@ -666,85 +705,11 @@ class InventoryChartsManager {
         console.log(`🏢 Supplier clicked: ${supplier.name}`);
         
         if (confirm(`View supplier details for "${supplier.name}"?\n\nProducts: ${supplier.products}\nInventory Value: ${this.formatCurrency(supplier.value)}`)) {
-            // Navigate to suppliers page (in future, might be supplier details page)
             window.location.href = '/suppliers';
         }
     }
 
-    // Utility Functions
-    createGradient(ctx, color, vertical = false) {
-        const gradient = ctx.createLinearGradient(0, 0, vertical ? 0 : ctx.canvas.width, vertical ? ctx.canvas.height : 0);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(1, color + '60');
-        return gradient;
-    }
-
-    formatCurrency(value) {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(value);
-    }
-
-    showChartLoading(chartName) {
-        const container = document.getElementById(chartName)?.closest('.chart-container');
-        if (container) {
-            container.style.opacity = '0.6';
-            container.style.pointerEvents = 'none';
-        }
-    }
-
-    hideChartLoading(chartName) {
-        const container = document.getElementById(chartName)?.closest('.chart-container');
-        if (container) {
-            container.style.opacity = '1';
-            container.style.pointerEvents = 'auto';
-        }
-    }
-
-    showChartError(canvasId, chartName) {
-        const canvas = document.getElementById(canvasId);
-        if (canvas) {
-            const container = canvas.closest('.chart-container');
-            container.innerHTML = `
-                <div class="chart-error">
-                    <div class="error-icon">⚠️</div>
-                    <div class="error-message">
-                        <strong>Chart Loading Error</strong><br>
-                        Unable to load ${chartName} chart. Please refresh the page.
-                    </div>
-                </div>
-            `;
-        }
-    }
-
-    showNotification(message, type = 'info') {
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `chart-notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <span class="notification-icon">
-                    ${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
-                </span>
-                <span class="notification-message">${message}</span>
-            </div>
-        `;
-        
-        // Add to page
-        document.body.appendChild(notification);
-        
-        // Auto-remove after 3 seconds
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateY(-20px)';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-
-    // Setup Event Listeners
+    // Advanced Event Listeners
     setupEventListeners() {
         // Period change handlers
         const activityPeriod = document.getElementById('activityPeriod');
@@ -761,13 +726,13 @@ class InventoryChartsManager {
             });
         }
 
-        // Refresh button handlers
+        // Enhanced refresh button handlers
         document.addEventListener('click', (e) => {
             if (e.target.matches('[data-refresh-chart]')) {
                 const chartName = e.target.getAttribute('data-refresh-chart');
                 this.refreshChart(chartName);
                 
-                // Visual feedback
+                // Enhanced visual feedback
                 e.target.disabled = true;
                 e.target.innerHTML = '⏳';
                 
@@ -781,29 +746,384 @@ class InventoryChartsManager {
             }
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
-                    case 'r':
-                        e.preventDefault();
-                        this.refreshAllCharts();
-                        break;
-                }
+        // Global refresh button
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('[data-refresh-all]')) {
+                this.refreshAllCharts();
+                this.showNotification('Refreshing all charts...', 'info');
             }
         });
 
         console.log('✅ Event listeners configured');
     }
 
+    // Keyboard Shortcuts for Power Users
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        this.refreshAllCharts();
+                        this.showNotification('Charts refreshed via keyboard shortcut', 'success');
+                        break;
+                    case '1':
+                        e.preventDefault();
+                        this.refreshChart('stockDistribution');
+                        break;
+                    case '2':
+                        e.preventDefault();
+                        this.refreshChart('topProducts');
+                        break;
+                    case '3':
+                        e.preventDefault();
+                        this.refreshChart('activity');
+                        break;
+                }
+            }
+        });
+
+        console.log('⌨️ Keyboard shortcuts enabled (Ctrl+R: refresh all, Ctrl+1-3: refresh specific charts)');
+    }
+
+    // Advanced Analytics Methods (Phase 5D Elements)
+    async calculateTrends() {
+        try {
+            const data = await this.fetchChartData('/api/charts/refresh_all');
+            if (!data) return null;
+
+            const analytics = {
+                stockHealth: this.analyzeStockHealth(data.stock_distribution),
+                performanceTrends: this.analyzePerformanceTrends(data.transaction_activity),
+                supplierInsights: this.analyzeSupplierInsights(data.supplier_performance),
+                predictions: this.generatePredictions(data)
+            };
+
+            return analytics;
+        } catch (error) {
+            console.error('Error calculating trends:', error);
+            return null;
+        }
+    }
+
+    analyzeStockHealth(stockData) {
+        const total = stockData.total;
+        const inStock = stockData.datasets[0].data[0];
+        const lowStock = stockData.datasets[0].data[1];
+        const outOfStock = stockData.datasets[0].data[2];
+
+        const healthScore = total > 0 ? ((inStock / total) * 100) : 0;
+        
+        return {
+            score: healthScore,
+            status: healthScore > 80 ? 'Excellent' : healthScore > 60 ? 'Good' : healthScore > 40 ? 'Fair' : 'Poor',
+            recommendations: this.generateStockRecommendations(healthScore, { inStock, lowStock, outOfStock })
+        };
+    }
+
+    analyzePerformanceTrends(activityData) {
+        const recentData = activityData.datasets[0].data;
+        const trend = this.calculateTrendDirection(recentData);
+        
+        return {
+            direction: trend.direction,
+            strength: trend.strength,
+            summary: `Activity is ${trend.direction} with ${trend.strength} momentum`
+        };
+    }
+
+    analyzeSupplierInsights(supplierData) {
+        const suppliers = supplierData.suppliers || [];
+        const topSupplier = suppliers[0];
+        const supplierConcentration = suppliers.length > 0 ? (topSupplier.value / suppliers.reduce((sum, s) => sum + s.value, 0)) * 100 : 0;
+
+        return {
+            concentration: supplierConcentration,
+            riskLevel: supplierConcentration > 50 ? 'High' : supplierConcentration > 30 ? 'Medium' : 'Low',
+            topSupplier: topSupplier?.name || 'None',
+            recommendation: this.generateSupplierRecommendation(supplierConcentration)
+        };
+    }
+
+    generatePredictions(allData) {
+        // Simplified prediction logic (in production, use more sophisticated algorithms)
+        return {
+            stockoutRisk: this.predictStockoutRisk(allData),
+            restockNeeds: this.predictRestockNeeds(allData),
+            valueProjection: this.projectInventoryValue(allData)
+        };
+    }
+
+    // Utility Functions
+    createGradient(ctx, color, vertical = false) {
+        // Safety check for canvas availability
+        if (!ctx || !ctx.canvas) {
+            console.warn('Canvas context not available, using solid color');
+            return color;
+        }
+        
+        try {
+            const canvas = ctx.canvas;
+            const gradient = ctx.createLinearGradient(
+                0, 0, 
+                vertical ? 0 : canvas.width, 
+                vertical ? canvas.height : 0
+            );
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, color + '60');
+            return gradient;
+        } catch (error) {
+            console.warn('Gradient creation failed, using solid color:', error);
+            return color;
+        }
+    }
+
+    formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value);
+    }
+
+    showChartLoading(chartName) {
+        const container = document.getElementById(chartName)?.closest('.chart-container');
+        if (container) {
+            container.style.opacity = '0.6';
+            container.style.pointerEvents = 'none';
+            
+            // Add loading spinner if not exists
+            let spinner = container.querySelector('.loading-spinner');
+            if (!spinner) {
+                spinner = document.createElement('div');
+                spinner.className = 'loading-spinner';
+                spinner.innerHTML = '⏳';
+                spinner.style.cssText = `
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 2rem;
+                    z-index: 1000;
+                `;
+                container.appendChild(spinner);
+            }
+        }
+    }
+
+    hideChartLoading(chartName) {
+        const container = document.getElementById(chartName)?.closest('.chart-container');
+        if (container) {
+            container.style.opacity = '1';
+            container.style.pointerEvents = 'auto';
+            
+            const spinner = container.querySelector('.loading-spinner');
+            if (spinner) {
+                spinner.remove();
+            }
+        }
+    }
+
+    showChartError(canvasId, chartName) {
+        const canvas = document.getElementById(canvasId);
+        if (canvas) {
+            const container = canvas.closest('.chart-container');
+            container.innerHTML = `
+                <div class="chart-error">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-message">
+                        <strong>Chart Loading Error</strong><br>
+                        Unable to load ${chartName} chart.<br>
+                        <button onclick="window.chartsManager.refreshChart('${canvasId.replace('Chart', '')}')" class="btn btn-small btn-primary" style="margin-top: 1rem;">
+                            🔄 Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `chart-notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-icon">
+                    ${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
+                </span>
+                <span class="notification-message">${message}</span>
+            </div>
+        `;
+        
+        // Enhanced notification styling
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-left: 4px solid ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 1rem;
+            z-index: 10000;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => notification.remove(), 300);
+        }, 4000);
+    }
+
+    // Error handling utilities
+    handleChartRefreshError(chartName, error) {
+        this.hideChartLoading(chartName);
+        
+        if (this.retryCount[chartName] < this.maxRetries) {
+            this.retryCount[chartName] = (this.retryCount[chartName] || 0) + 1;
+            console.log(`🔄 Retrying ${chartName} refresh (${this.retryCount[chartName]}/${this.maxRetries})`);
+            
+            setTimeout(() => {
+                this.refreshChart(chartName);
+            }, 2000 * this.retryCount[chartName]);
+        } else {
+            this.showNotification(`Failed to refresh ${chartName} chart`, 'error');
+        }
+    }
+
+    resetRetryCount(chartName) {
+        if (this.retryCount[chartName]) {
+            delete this.retryCount[chartName];
+        }
+    }
+
+    // Advanced analytics helper methods
+    calculateTrendDirection(data) {
+        if (data.length < 2) return { direction: 'stable', strength: 'weak' };
+        
+        const firstHalf = data.slice(0, Math.floor(data.length / 2));
+        const secondHalf = data.slice(Math.floor(data.length / 2));
+        
+        const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+        const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+        
+        const change = ((secondAvg - firstAvg) / firstAvg) * 100;
+        
+        return {
+            direction: change > 5 ? 'increasing' : change < -5 ? 'decreasing' : 'stable',
+            strength: Math.abs(change) > 20 ? 'strong' : Math.abs(change) > 10 ? 'moderate' : 'weak'
+        };
+    }
+
+    generateStockRecommendations(healthScore, stocks) {
+        const recommendations = [];
+        
+        if (healthScore < 60) {
+            recommendations.push('Consider increasing minimum stock levels');
+        }
+        if (stocks.outOfStock > 0) {
+            recommendations.push(`${stocks.outOfStock} products need immediate restocking`);
+        }
+        if (stocks.lowStock > stocks.inStock * 0.3) {
+            recommendations.push('Review reorder points for better stock management');
+        }
+        
+        return recommendations.length > 0 ? recommendations : ['Stock levels are well managed'];
+    }
+
+    generateSupplierRecommendation(concentration) {
+        if (concentration > 50) {
+            return 'Consider diversifying suppliers to reduce risk';
+        } else if (concentration > 30) {
+            return 'Supplier concentration is moderate - monitor dependency';
+        } else {
+            return 'Good supplier diversification maintained';
+        }
+    }
+
+    predictStockoutRisk(data) {
+        // Simplified risk assessment
+        const stockData = data.stock_distribution;
+        const total = stockData.total;
+        const outOfStock = stockData.datasets[0].data[2];
+        const lowStock = stockData.datasets[0].data[1];
+        
+        const riskScore = total > 0 ? ((outOfStock + lowStock) / total) * 100 : 0;
+        
+        return {
+            score: riskScore,
+            level: riskScore > 30 ? 'High' : riskScore > 15 ? 'Medium' : 'Low'
+        };
+    }
+
+    predictRestockNeeds(data) {
+        // Generate restock predictions based on current data
+        return {
+            urgentRestocks: data.alert_distribution?.details?.critical || 0,
+            plannedRestocks: data.alert_distribution?.details?.warning || 0,
+            timeline: 'Next 7-14 days'
+        };
+    }
+
+    projectInventoryValue(data) {
+        const currentValue = data.inventory_value_trend?.datasets[0]?.data?.slice(-1)[0] || 0;
+        const trend = this.calculateTrendDirection(data.inventory_value_trend?.datasets[0]?.data || []);
+        
+        let projectedChange = 0;
+        if (trend.direction === 'increasing') {
+            projectedChange = trend.strength === 'strong' ? 0.15 : trend.strength === 'moderate' ? 0.08 : 0.03;
+        } else if (trend.direction === 'decreasing') {
+            projectedChange = trend.strength === 'strong' ? -0.15 : trend.strength === 'moderate' ? -0.08 : -0.03;
+        }
+        
+        return {
+            current: currentValue,
+            projected: currentValue * (1 + projectedChange),
+            change: projectedChange * 100,
+            confidence: trend.strength === 'strong' ? 'High' : trend.strength === 'moderate' ? 'Medium' : 'Low'
+        };
+    }
+
+    // Export and utility functions
+    exportChart(chartName, filename) {
+        const chart = this.charts[chartName];
+        if (chart) {
+            const url = chart.toBase64Image('image/png', 1.0);
+            const link = document.createElement('a');
+            link.download = filename || `${chartName}_chart_${new Date().toISOString().slice(0, 10)}.png`;
+            link.href = url;
+            link.click();
+            
+            this.showNotification(`Chart exported: ${link.download}`, 'success');
+        }
+    }
+
+    getSystemHealth() {
+        return {
+            chartsInitialized: Object.keys(this.charts).length,
+            autoRefreshActive: !!this.updateInterval,
+            lastUpdate: new Date().toISOString(),
+            systemStatus: this.isInitialized ? 'Operational' : 'Initializing'
+        };
+    }
+
     // Cleanup function
     destroy() {
-        // Clear auto-refresh interval
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
         }
 
-        // Destroy all chart instances
         Object.values(this.charts).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') {
                 chart.destroy();
@@ -822,13 +1142,12 @@ window.chartsManager = new InventoryChartsManager();
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Only initialize on dashboard page
     if (window.location.pathname === '/dashboard') {
         window.chartsManager.initialize();
     }
 });
 
-// Global functions for template compatibility
+// Global functions for backward compatibility
 window.refreshChart = function(chartName) {
     if (window.chartsManager && window.chartsManager.isInitialized) {
         window.chartsManager.refreshChart(chartName);
@@ -847,21 +1166,12 @@ window.updateValueChart = function() {
     }
 };
 
-// Additional utility functions for chart management
+// Advanced Chart Utilities
 window.ChartUtils = {
-    // Export chart as image
     exportChart: function(chartName, filename) {
-        const chart = window.chartsManager.charts[chartName];
-        if (chart) {
-            const url = chart.toBase64Image('image/png', 1.0);
-            const link = document.createElement('a');
-            link.download = filename || `${chartName}_chart.png`;
-            link.href = url;
-            link.click();
-        }
+        window.chartsManager.exportChart(chartName, filename);
     },
 
-    // Print chart
     printChart: function(chartName) {
         const chart = window.chartsManager.charts[chartName];
         if (chart) {
@@ -871,28 +1181,32 @@ window.ChartUtils = {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Chart Print</title>
+                    <title>Inventory Chart - ${chartName}</title>
                     <style>
-                        body { margin: 0; padding: 20px; text-align: center; }
-                        img { max-width: 100%; height: auto; }
+                        body { margin: 0; padding: 20px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+                        img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; }
                         .print-header { margin-bottom: 20px; color: #2c3e50; }
+                        .print-footer { margin-top: 20px; color: #7f8c8d; font-size: 0.9rem; }
                     </style>
                 </head>
                 <body>
                     <div class="print-header">
-                        <h2>Inventory Management Chart</h2>
+                        <h2>Inventory Management System</h2>
+                        <h3>${chartName.charAt(0).toUpperCase() + chartName.slice(1)} Chart</h3>
                         <p>Generated: ${new Date().toLocaleString()}</p>
                     </div>
                     <img src="${imageUrl}" alt="${chartName} Chart">
+                    <div class="print-footer">
+                        <p>Professional Inventory Management System - Advanced Analytics Dashboard</p>
+                    </div>
                 </body>
                 </html>
             `);
             printWindow.document.close();
-            printWindow.print();
+            setTimeout(() => printWindow.print(), 500);
         }
     },
 
-    // Get chart data summary
     getChartSummary: function(chartName) {
         const chart = window.chartsManager.charts[chartName];
         if (chart) {
@@ -900,13 +1214,38 @@ window.ChartUtils = {
                 type: chart.config.type,
                 datasets: chart.data.datasets.length,
                 dataPoints: chart.data.labels.length,
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                isResponsive: chart.options.responsive
             };
         }
         return null;
+    },
+
+    getSystemHealth: function() {
+        return window.chartsManager.getSystemHealth();
+    },
+
+    // Advanced analytics access
+    getAnalytics: async function() {
+        return await window.chartsManager.calculateTrends();
     }
 };
 
+// Performance monitoring
 console.log('📊 Advanced Chart Management System Loaded');
-console.log('🎯 Features: Real-time updates, Interactive drilling, Mobile responsive, Error handling');
-console.log('⌨️  Keyboard shortcuts: Ctrl+R (Refresh all charts)');
+console.log('🎯 Features: Real-time API integration, Interactive drilling, Mobile responsive, Advanced analytics');
+console.log('⌨️ Shortcuts: Ctrl+R (Refresh all), Ctrl+1-3 (Refresh specific charts)');
+console.log('🔧 Utils: ChartUtils.exportChart(), ChartUtils.getAnalytics()');
+
+// Performance tracking
+const performanceObserver = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        if (entry.name.includes('chart')) {
+            console.log(`📈 Chart performance: ${entry.name} took ${entry.duration.toFixed(2)}ms`);
+        }
+    }
+});
+
+if (typeof PerformanceObserver !== 'undefined') {
+    performanceObserver.observe({ entryTypes: ['measure'] });
+}

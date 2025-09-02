@@ -1703,3 +1703,816 @@ body {
 .bg-chart-warning { background-color: #f39c12 !important; }
 .bg-chart-danger { background-color: #e74c3c !important; }
 .bg-chart-info { background-color: #3498db !important; }
+
+* {
+    /* Hardware acceleration for smooth animations */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* Optimize chart containers for better rendering */
+.chart-container canvas {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    will-change: transform;
+}
+
+/* Reduce repaints with efficient transitions */
+.chart-card,
+.metric-card,
+.dashboard-card {
+    contain: layout style paint;
+    will-change: transform, box-shadow;
+}
+
+/* ===== ADVANCED ANALYTICS DASHBOARD ENHANCEMENTS ===== */
+.analytics-dashboard {
+    display: grid;
+    grid-template-areas: 
+        "header header header"
+        "kpis kpis kpis"
+        "charts charts insights"
+        "recommendations recommendations recommendations";
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-columns: 2fr 2fr 1fr;
+    gap: 1.5rem;
+    min-height: 100vh;
+}
+
+.dashboard-header { grid-area: header; }
+.metrics-grid { grid-area: kpis; }
+.charts-section { grid-area: charts; }
+.insights-panel { grid-area: insights; }
+.recommendations-panel { grid-area: recommendations; }
+
+/* Enhanced KPI Cards with Micro-Charts */
+.metric-card.enhanced {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.metric-card.enhanced::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--metric-color), var(--metric-color-light));
+}
+
+.metric-card.enhanced.primary { 
+    --metric-color: #3498db; 
+    --metric-color-light: #5dade2;
+}
+
+.metric-card.enhanced.success { 
+    --metric-color: #27ae60; 
+    --metric-color-light: #52c882;
+}
+
+.metric-card.enhanced.warning { 
+    --metric-color: #f39c12; 
+    --metric-color-light: #f5b041;
+}
+
+.metric-card.enhanced.danger { 
+    --metric-color: #e74c3c; 
+    --metric-color-light: #ec7063;
+}
+
+.metric-content {
+    position: relative;
+    z-index: 2;
+}
+
+.metric-trend {
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.metric-trend.up { color: #27ae60; }
+.metric-trend.down { color: #e74c3c; }
+.metric-trend.stable { color: #95a5a6; }
+
+.metric-mini-chart {
+    width: 60px;
+    height: 20px;
+    opacity: 0.3;
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+}
+
+/* ===== INSIGHTS PANEL ===== */
+.insights-panel {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    max-height: 600px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+.insights-panel h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.insight-item {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid;
+    border-radius: 0 8px 8px 0;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.insight-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.insight-item.positive { border-left-color: #27ae60; }
+.insight-item.warning { border-left-color: #f39c12; }
+.insight-item.critical { border-left-color: #e74c3c; }
+.insight-item.info { border-left-color: #3498db; }
+
+.insight-title {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.insight-description {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.insight-action {
+    margin-top: 0.75rem;
+}
+
+.insight-action .btn-small {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+}
+
+/* ===== RECOMMENDATIONS PANEL ===== */
+.recommendations-panel {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.recommendations-panel h3 {
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+}
+
+.recommendation-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.recommendation-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.recommendation-priority {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.recommendation-priority.high {
+    background: rgba(231, 76, 60, 0.8);
+}
+
+.recommendation-priority.medium {
+    background: rgba(243, 156, 18, 0.8);
+}
+
+.recommendation-priority.low {
+    background: rgba(39, 174, 96, 0.8);
+}
+
+.recommendation-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.recommendation-description {
+    opacity: 0.9;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+/* ===== ENHANCED CHART STYLES ===== */
+.chart-card.analytics-enhanced {
+    position: relative;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid rgba(52, 152, 219, 0.1);
+}
+
+.chart-card.analytics-enhanced::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #3498db, #2ecc71, #f39c12, #e74c3c, #9b59b6);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.chart-card.analytics-enhanced:hover::after {
+    opacity: 1;
+}
+
+.chart-header.enhanced {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #e9ecef;
+    position: relative;
+}
+
+.chart-header.enhanced::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 1.5rem;
+    right: 1.5rem;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #3498db, transparent);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.chart-card:hover .chart-header.enhanced::before {
+    transform: scaleX(1);
+}
+
+.chart-controls.enhanced {
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+
+.chart-controls.enhanced .form-control {
+    background: white;
+    border: 1px solid rgba(52, 152, 219, 0.2);
+    transition: all 0.3s ease;
+}
+
+.chart-controls.enhanced .form-control:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+/* ===== PERFORMANCE INDICATORS ===== */
+.performance-indicator {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #27ae60;
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.5);
+    animation: pulse-indicator 2s infinite;
+}
+
+.performance-indicator.loading {
+    background: #f39c12;
+    box-shadow: 0 0 8px rgba(243, 156, 18, 0.5);
+}
+
+.performance-indicator.error {
+    background: #e74c3c;
+    box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+}
+
+@keyframes pulse-indicator {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.2); }
+}
+
+/* ===== ADVANCED DATA VISUALIZATION ===== */
+.data-viz-container {
+    position: relative;
+    background: #fefefe;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.data-viz-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(52, 152, 219, 0.1) 50%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.data-viz-container:hover .data-viz-overlay {
+    opacity: 1;
+}
+
+/* ===== NOTIFICATION SYSTEM ENHANCEMENTS ===== */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    max-width: 400px;
+}
+
+.chart-notification {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    border-left: 4px solid;
+    transform: translateX(100%);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+}
+
+.chart-notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.chart-notification.success { border-left-color: #27ae60; }
+.chart-notification.error { border-left-color: #e74c3c; }
+.chart-notification.info { border-left-color: #3498db; }
+.chart-notification.warning { border-left-color: #f39c12; }
+
+.notification-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.notification-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.notification-message {
+    flex: 1;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    color: #95a5a6;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.notification-close:hover {
+    background: #ecf0f1;
+    color: #2c3e50;
+}
+
+/* ===== ADVANCED LOADING STATES ===== */
+.skeleton-loader {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes loading-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.chart-skeleton {
+    width: 100%;
+    height: 300px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+.metric-skeleton {
+    height: 80px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+/* ===== RESPONSIVE ENHANCEMENTS ===== */
+@media (max-width: 1400px) {
+    .analytics-dashboard {
+        grid-template-areas: 
+            "header header"
+            "kpis kpis"
+            "charts insights"
+            "recommendations recommendations";
+        grid-template-columns: 2fr 1fr;
+    }
+}
+
+@media (max-width: 1024px) {
+    .analytics-dashboard {
+        grid-template-areas: 
+            "header"
+            "kpis"
+            "charts"
+            "insights"
+            "recommendations";
+        grid-template-columns: 1fr;
+    }
+    
+    .insights-panel {
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .metric-card.enhanced {
+        padding: 1rem;
+    }
+    
+    .metric-icon {
+        font-size: 2rem;
+    }
+    
+    .metric-number {
+        font-size: 1.5rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+        padding: 1rem;
+    }
+    
+    .chart-container.large {
+        height: 300px;
+    }
+    
+    .chart-header {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+    
+    .chart-controls {
+        justify-content: center;
+    }
+    
+    .insights-panel {
+        padding: 1rem;
+    }
+    
+    .recommendations-panel {
+        padding: 1.5rem;
+    }
+    
+    .notification-container {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .metrics-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .chart-card {
+        border-radius: 10px;
+    }
+    
+    .chart-container {
+        height: 220px;
+        padding: 0.75rem;
+    }
+    
+    .chart-container.large {
+        height: 280px;
+    }
+    
+    .dashboard-header {
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .dashboard-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .insight-item,
+    .recommendation-item {
+        padding: 0.75rem;
+    }
+}
+
+/* ===== PRINT OPTIMIZATIONS ===== */
+@media print {
+    .chart-notification,
+    .chart-controls,
+    .performance-indicator {
+        display: none !important;
+    }
+    
+    .chart-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+    
+    .analytics-dashboard {
+        display: block;
+    }
+    
+    .charts-section {
+        display: block;
+    }
+    
+    .chart-card {
+        margin-bottom: 2rem;
+    }
+    
+    .recommendations-panel {
+        background: #f8f9fa;
+        color: #2c3e50;
+        border: 2px solid #dee2e6;
+    }
+}
+
+/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .chart-notification {
+        transform: none;
+        opacity: 1;
+        transition: none;
+    }
+}
+
+@media (prefers-contrast: high) {
+    .chart-card,
+    .metric-card,
+    .dashboard-card {
+        border: 2px solid #000;
+        box-shadow: none;
+    }
+    
+    .chart-notification {
+        border: 2px solid #000;
+        box-shadow: none;
+    }
+}
+
+/* Focus management for keyboard navigation */
+.chart-card:focus-within,
+.metric-card:focus-within {
+    outline: 3px solid #3498db;
+    outline-offset: 2px;
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #2c3e50;
+        --bg-secondary: #34495e;
+        --text-primary: #ecf0f1;
+        --text-secondary: #bdc3c7;
+        --border-color: #4a6741;
+    }
+    
+    .analytics-dashboard {
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+    
+    .chart-card,
+    .metric-card,
+    .dashboard-card {
+        background: var(--bg-secondary);
+        border-color: var(--border-color);
+    }
+    
+    .insights-panel,
+    .recommendations-panel {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+    }
+    
+    .chart-notification {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+    }
+    
+    .notification-message {
+        color: var(--text-primary);
+    }
+}
+
+/* ===== MICRO-INTERACTIONS ===== */
+.interactive-element {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.interactive-element::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: all 0.5s ease;
+}
+
+.interactive-element:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* ===== PERFORMANCE MONITORING ===== */
+.perf-monitor {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    z-index: 9999;
+    display: none; /* Show only in development */
+}
+
+.perf-monitor.show {
+    display: block;
+}
+
+.perf-metric {
+    margin-right: 1rem;
+}
+
+.perf-good { color: #27ae60; }
+.perf-warn { color: #f39c12; }
+.perf-poor { color: #e74c3c; }
+
+/* ===== UTILITY CLASSES FOR PHASE 5 ===== */
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.slide-up {
+    animation: slideUp 0.6s ease-out;
+}
+
+.scale-in {
+    animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bounce-in {
+    animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bounceIn {
+    from { opacity: 0; transform: scale(0.3); }
+    50% { transform: scale(1.05); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* ===== HIGH-PERFORMANCE CHART OPTIMIZATIONS ===== */
+.chart-container.optimized {
+    contain: strict;
+    isolation: isolate;
+}
+
+.chart-container.optimized canvas {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    image-rendering: pixelated;
+}
+
+/* GPU-accelerated animations for smooth 60fps performance */
+.gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+}
+
+/* Memory-efficient gradients */
+.efficient-gradient {
+    background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
+    background-size: 100% 100%;
+}
+
+/* Critical rendering path optimization */
+.above-fold {
+    contain: layout style;
+}
+
+.below-fold {
+    content-visibility: auto;
+    contain-intrinsic-size: 300px;
+}
+
+/* ===== FINAL PERFORMANCE TUNING ===== */
+/* Reduce layout thrashing */
+.layout-stable {
+    contain: layout;
+    will-change: transform, opacity;
+}
+
+/* Optimize repaints */
+.paint-optimized {
+    contain: paint;
+    transform: translateZ(0);
+}
+
+/* Memory management */
+.memory-efficient {
+    contain: strict;
+    content-visibility: auto;
+}
+
+/* Critical path rendering */
+.critical-render {
+    font-display: swap;
+    contain: layout style paint;
+    will-change: auto;
+}
+
+/* End of Phase 5 Consolidated CSS */

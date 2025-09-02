@@ -20,6 +20,7 @@
             <ul class="nav-links">
                 <li><a href="{{ url_for('index') }}">Home</a></li>
                 <li><a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}nav-active{% endif %}">Dashboard</a></li>
+                <li><a href="{{ url_for('analytics') }}" class="{% if request.endpoint == 'analytics' %}nav-active{% endif %}">Analytics</a></li>
                 <li><a href="{{ url_for('products') }}" class="{% if request.endpoint == 'products' %}nav-active{% endif %}">Products</a></li>
                 <li><a href="{{ url_for('suppliers') }}" class="{% if request.endpoint == 'suppliers' %}nav-active{% endif %}">Suppliers</a></li>
                 <li><a href="{{ url_for('transactions') }}" class="{% if request.endpoint == 'transactions' %}nav-active{% endif %}">Transaction History</a></li>
