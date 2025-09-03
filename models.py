@@ -1,5 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from enum import Enum
 
 db = SQLAlchemy()
 
@@ -142,3 +145,99 @@ class ReorderPoint(db.Model):
         current = self.product.quantity
         needed_to_reach_reorder = self.reorder_quantity - current
         return max(needed_to_reach_reorder, 0)
+    
+class UserRole(Enum):
+    """Define user roles for the inventory system"""
+    ADMIN = "admin"          # Full system access, user management
+    MANAGER = "manager"      # Analytics, reports, all inventory operations
+    EMPLOYEE = "employee"    # Basic inventory operations, limited analytics
+
+class User(UserMixin, db.Model):
+    """
+    Phase 6: User authentication and role management
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Authentication fields
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    
+    # Profile information
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    role = db.Column(db.Enum(UserRole), default=UserRole.EMPLOYEE, nullable=False)
+    
+    # Account management
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_login = db.Column(db.DateTime)
+    login_count = db.Column(db.Integer, default=0)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<User {self.username} ({self.role.value})>'
+    
+    def set_password(self, password):
+        """Hash and store password securely"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verify password against stored hash"""
+        return check_password_hash(self.password_hash, password)
+    
+    def has_role(self, role):
+        """Check if user has specific role"""
+        if isinstance(role, str):
+            role = UserRole(role)
+        return self.role == role
+    
+    def has_permission(self, permission):
+        """Check if user has specific permission based on role hierarchy"""
+        permissions = {
+            UserRole.ADMIN: {
+                'user_management', 'system_config', 'all_analytics', 
+                'all_reports', 'bulk_operations', 'import_export',
+                'product_management', 'supplier_management', 'stock_operations'
+            },
+            UserRole.MANAGER: {
+                'all_analytics', 'all_reports', 'bulk_operations', 
+                'import_export', 'product_management', 'supplier_management', 
+                'stock_operations', 'alert_management'
+            },
+            UserRole.EMPLOYEE: {
+                'basic_analytics', 'product_view', 'stock_operations',
+                'basic_reports'
+            }
+        }
+        return permission in permissions.get(self.role, set())
+    
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"
+    
+    @property
+    def is_admin(self):
+        return self.role == UserRole.ADMIN
+    
+    @property
+    def is_manager(self):
+        return self.role == UserRole.MANAGER
+    
+    @property
+    def is_employee(self):
+        return self.role == UserRole.EMPLOYEE
+    
+    def update_login_stats(self):
+        self.last_login = datetime.utcnow()
+        self.login_count = (self.login_count or 0) + 1
+    
+    @property
+    def role_display(self):
+        role_names = {
+            UserRole.ADMIN: "Administrator",
+            UserRole.MANAGER: "Manager", 
+            UserRole.EMPLOYEE: "Employee"
+        }
+        return role_names.get(self.role, "Unknown")

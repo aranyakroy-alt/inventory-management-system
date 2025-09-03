@@ -4,3 +4,6 @@ reportlab
 matplotlib
 pillow
 python-dateutil
+flask-login
+flask-wtf
+werkzeug

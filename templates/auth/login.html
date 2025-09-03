@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Inventory Management System{% endblock %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <h2 style="text-align: center; margin-bottom: 2rem; color: #2c3e50;">🔐 Login</h2>
+    
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.username.label(style="display: block; margin-bottom: 0.5rem; font-weight: 500;") }}
+            {{ form.username(style="width: 100%; padding: 0.75rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem;", placeholder="Username or email") }}
+            {% if form.username.errors %}
+                {% for error in form.username.errors %}
+                    <div style="color: #e74c3c; font-size: 0.9rem; margin-top: 0.25rem;">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            {{ form.password.label(style="display: block; margin-bottom: 0.5rem; font-weight: 500;") }}
+            {{ form.password(style="width: 100%; padding: 0.75rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem;", placeholder="Password") }}
+            {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                    <div style="color: #e74c3c; font-size: 0.9rem; margin-top: 0.25rem;">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 1.5rem;">
+            {{ form.remember_me() }} {{ form.remember_me.label(style="margin-left: 0.5rem;") }}
+        </div>
+        
+        {{ form.submit(style="width: 100%; padding: 1rem; background: #3498db; color: white; border: none; border-radius: 5px; font-size: 1rem; font-weight: 600; cursor: pointer;") }}
+    </form>
+    
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #eee;">
+        <p style="margin: 0; color: #666; font-size: 0.9rem;">Demo Login:</p>
+        <p style="margin: 0.5rem 0; font-family: monospace; background: #f8f9fa; padding: 0.5rem; border-radius: 3px; font-size: 0.9rem;">
+            Username: <strong>admin</strong><br>
+            Password: <strong>admin123</strong>
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Add New User - Inventory Management System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-content">
+        <h1>➕ Add New User</h1>
+        <p>Create a new user account with role-based permissions</p>
+    </div>
+    <div class="header-actions">
+        <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">
+            ← Back to Users
+        </a>
+    </div>
+</div>
+
+<div class="form-container">
+    <div class="form-card">
+        <form method="POST" class="user-form">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-row">
+                <div class="form-group">
+                    {{ form.first_name.label(class="form-label") }}
+                    {{ form.first_name(class="form-input", placeholder="Enter first name") }}
+                    {% if form.first_name.errors %}
+                        <div class="field-errors">
+                            {% for error in form.first_name.errors %}
+                                <span class="error-message">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    {{ form.last_name.label(class="form-label") }}
+                    {{ form.last_name(class="form-input", placeholder="Enter last name") }}
+                    {% if form.last_name.errors %}
+                        <div class="field-errors">
+                            {% for error in form.last_name.errors %}
+                                <span class="error-message">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    {{ form.username.label(class="form-label") }}
+                    {{ form.username(class="form-input", placeholder="Enter username") }}
+                    {% if form.username.errors %}
+                        <div class="field-errors">
+                            {% for error in form.username.errors %}
+                                <span class="error-message">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    {{ form.email.label(class="form-label") }}
+                    {{ form.email(class="form-input", placeholder="Enter email address") }}
+                    {% if form.email.errors %}
+                        <div class="field-errors">
+                            {% for error in form.email.errors %}
+                                <span class="error-message">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-group">
+                {{ form.role.label(class="form-label") }}
+                {{ form.role(class="form-select") }}
+                {% if form.role.errors %}
+                    <div class="field-errors">
+                        {% for error in form.role.errors %}
+                            <span class="error-message">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <div class="form-help">
+                    <strong>Role Permissions:</strong><br>
+                    • <strong>Employee:</strong> Basic inventory operations, limited analytics<br>
+                    • <strong>Manager:</strong> Full inventory control, all analytics and reports<br>
+                    • <strong>Administrator:</strong> Complete system access including user management
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-input", placeholder="Enter password (min 6 characters)") }}
+                    {% if form.password.errors %}
+                        <div class="field-errors">
+                            {% for error in form.password.errors %}
+                                <span class="error-message">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    {{ form.password_confirm.label(class="form-label") }}
+                    {{ form.password_confirm(class="form-input", placeholder="Confirm password") }}
+                    {% if form.password_confirm.errors %}
+                        <div class="field-errors">
+                            {% for error in form.password_confirm.errors %}
+                                <span class="error-message">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                {{ form.is_active(class="form-checkbox") }}
+                {{ form.is_active.label(class="checkbox-label") }}
+                <div class="form-help">Active users can log in and access the system</div>
+            </div>
+            
+            <div class="form-actions">
+                {{ form.submit(class="btn btn-primary btn-large") }}
+                <a href="{{ url_for('manage_users') }}" class="btn btn-secondary btn-large">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.header-content h1 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 2rem;
+}
+
+.header-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+.form-container {
+    display: flex;
+    justify-content: center;
+}
+
+.form-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 800px;
+    border: 2px solid #e9ecef;
+}
+
+.user-form .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 0;
+}
+
+.user-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.user-form .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #495057;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.user-form .form-input,
+.user-form .form-select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    box-sizing: border-box;
+}
+
+.user-form .form-input:focus,
+.user-form .form-select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    flex-direction: column;
+}
+
+.checkbox-group .form-checkbox {
+    width: auto !important;
+    margin: 0;
+}
+
+.checkbox-group .checkbox-label {
+    margin: 0 !important;
+    font-size: 1rem;
+    color: #495057;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.form-help {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+.field-errors {
+    margin-top: 0.25rem;
+}
+
+.error-message {
+    display: block;
+    color: #e74c3c;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.btn-large {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    min-width: 120px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .form-card {
+        padding: 2rem 1.5rem;
+    }
+    
+    .user-form .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, make_response, session
 import os
 from models import db, Product, Supplier, StockTransaction, ReorderPoint
 import csv
@@ -9,6 +9,15 @@ from datetime import datetime, timedelta, date
 import json
 from collections import defaultdict
 import statistics
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from forms import LoginForm, UserRegistrationForm, UserEditForm, PasswordChangeForm, AdminPasswordResetForm
+from auth_utils import (login_required_with_message, role_required, permission_required, 
+                       admin_required, manager_or_admin_required, active_user_required,
+                       self_or_admin_required, auth_template_context)
+from models import User, UserRole  # Add User, UserRole to your existing models import
+from werkzeug.security import generate_password_hash
+
+
 
 def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
     """
@@ -41,7 +50,8 @@ def log_stock_transaction(product, quantity_change, transaction_type, reason, us
         quantity_before=quantity_before,
         quantity_after=quantity_after,
         reason=reason,
-        user_notes=user_notes
+        user_notes=user_notes,
+        performed_by_id=current_user.id if current_user.is_authenticated else None  
     )
     
     # Add transaction to database session (will be committed with product)
@@ -275,6 +285,81 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your-secret-key-here'  # Needed for flash messages
 
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS attacks
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)  # Session expires after 2 hours
+
+
+# Flask-Login configuration
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'info'
+
+# Add authentication context to all templates
+app.context_processor(auth_template_context)
+
+@app.before_request
+def session_security():
+    """Enhanced session security and cleanup"""
+    # Make sessions permanent with timeout
+    session.permanent = True
+    
+    # Force logout if session is too old or invalid
+    if current_user.is_authenticated:
+        # Check if user account is still active
+        if not current_user.is_active:
+            logout_user()
+            session.clear()
+            flash('Your account has been deactivated. Please contact an administrator.', 'error')
+            return redirect(url_for('login'))
+    
+    # Prevent access to login page if already logged in
+    if request.endpoint == 'login' and current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+@app.after_request
+def after_request_security(response):
+    """Add security headers to all responses"""
+    # Prevent caching of sensitive pages for logged-in users
+    if current_user.is_authenticated:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    
+    # Security headers
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'  # Prevent clickjacking
+    response.headers['X-Content-Type-Options'] = 'nosniff'  # Prevent MIME sniffing
+    
+    return response
+
+# =============================================================================
+# FORCE LOGOUT UTILITY FUNCTION
+# =============================================================================
+
+def force_logout_user(user_id, reason="Administrative action"):
+    """Force logout a specific user (admin function)"""
+    try:
+        # This would be more complex in production with session storage
+        # For now, we'll just deactivate the user
+        user = User.query.get(user_id)
+        if user:
+            user.is_active = False
+            db.session.commit()
+            print(f"User {user.username} force-logged out: {reason}")
+            return True
+    except Exception as e:
+        print(f"Error force-logging out user {user_id}: {str(e)}")
+    return False
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user for Flask-Login"""
+    return User.query.get(int(user_id))
+
 # Initialize database with app
 db.init_app(app)
 
@@ -285,6 +370,8 @@ def index():
     return render_template('index.html')
 
 @app.route('/products')
+@login_required_with_message
+@active_user_required
 def products():
     """Display all products with optional search and filter"""
     search_query = request.args.get('search', '').strip()
@@ -1053,7 +1140,9 @@ def export_alerts():
         flash(f'Export failed: {str(e)}', 'error')
         return redirect(url_for('alerts'))
 
+# NEW: Manager/admin only
 @app.route('/import_export')
+@manager_or_admin_required
 def import_export():
     """Import/Export management page"""
     # Get summary statistics for the import/export page
@@ -2689,10 +2778,297 @@ def api_dashboard_analytics():
         }), 500
     
 @app.route('/analytics')
+@permission_required('all_analytics', 'basic_analytics')
 def analytics():
     """Advanced analytics dashboard page"""
     return render_template('analytics.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login page"""
+    # Redirect if already logged in
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     
+    form = LoginForm()
+    
+    if form.validate_on_submit():
+        # Find user by username or email
+        user = User.query.filter(
+            (User.username == form.username.data) | 
+            (User.email == form.username.data)
+        ).first()
+        
+        # Verify user exists, password is correct, and account is active
+        if user and user.check_password(form.password.data):
+            if not user.is_active:
+                flash('Your account has been deactivated. Please contact an administrator.', 'error')
+                return render_template('auth/login.html', form=form)
+            
+            # Log the user in
+            login_user(user, remember=form.remember_me.data)
+            
+            # Update login statistics
+            user.update_login_stats()
+            db.session.commit()
+            
+            # Redirect to intended page or dashboard
+            next_page = request.args.get('next')
+            if not next_page or not next_page.startswith('/'):
+                next_page = url_for('dashboard')
+            
+            flash(f'Welcome back, {user.first_name}! You have been logged in successfully.', 'success')
+            return redirect(next_page)
+        else:
+            flash('Invalid username/email or password. Please try again.', 'error')
+    
+    return render_template('auth/login.html', form=form)
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Enhanced logout with proper session cleanup"""
+    try:
+        user_name = current_user.first_name if current_user.is_authenticated else "User"
+        
+        # Log the logout (optional - for security audit)
+        if current_user.is_authenticated:
+            print(f"User {current_user.username} logged out at {datetime.utcnow()}")
+        
+        # Logout user and clear session
+        logout_user()
+        
+        # Clear all session data
+        session.clear()
+        
+        # Flash success message
+        flash(f'Goodbye, {user_name}! You have been logged out successfully.', 'success')
+        
+        # Redirect to login page
+        response = make_response(redirect(url_for('login')))
+        
+        # Clear any cached data and prevent back button login
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'  
+        response.headers['Expires'] = '0'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Logout error: {str(e)}")
+        # Force clear session even if there's an error
+        session.clear()
+        flash('You have been logged out.', 'info')
+        return redirect(url_for('login'))
+
+@app.route('/profile')
+@login_required_with_message
+@active_user_required
+def profile():
+    """User profile page"""
+    return render_template('auth/profile.html', user=current_user)
+
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required_with_message
+@active_user_required
+def change_password():
+    """Allow users to change their password"""
+    form = PasswordChangeForm()
+    
+    if form.validate_on_submit():
+        # Verify current password
+        if not current_user.check_password(form.current_password.data):
+            flash('Current password is incorrect.', 'error')
+            return render_template('auth/change_password.html', form=form)
+        
+        # Update password
+        current_user.set_password(form.new_password.data)
+        db.session.commit()
+        
+        flash('Your password has been changed successfully.', 'success')
+        return redirect(url_for('profile'))
+    
+    return render_template('auth/change_password.html', form=form)
+
+# =============================================================================
+# PHASE 6A: USER MANAGEMENT ROUTES (Admin only)
+# =============================================================================
+
+@app.route('/admin/users')
+@admin_required
+def manage_users():
+    """Admin page to manage all users"""
+    users = User.query.order_by(User.last_login.desc().nullslast(), User.created_at.desc()).all()
+    
+    # Calculate user statistics
+    stats = {
+        'total_users': len(users),
+        'active_users': sum(1 for u in users if u.is_active),
+        'admin_count': sum(1 for u in users if u.is_admin),
+        'manager_count': sum(1 for u in users if u.is_manager),
+        'employee_count': sum(1 for u in users if u.is_employee),
+        'recent_logins': sum(1 for u in users if u.last_login and 
+                           (datetime.utcnow() - u.last_login).days < 7)
+    }
+    
+    return render_template('auth/manage_users.html', users=users, stats=stats)
+
+@app.route('/admin/users/add', methods=['GET', 'POST'])
+@admin_required
+def add_user():
+    """Admin form to create new users"""
+    form = UserRegistrationForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Create new user
+            new_user = User(
+                username=form.username.data,
+                email=form.email.data,
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                role=UserRole(form.role.data),
+                is_active=form.is_active.data,
+                created_by_id=current_user.id
+            )
+            
+            new_user.set_password(form.password.data)
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            flash(f'User "{new_user.username}" ({new_user.role_display}) created successfully!', 'success')
+            return redirect(url_for('manage_users'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating user: {str(e)}', 'error')
+    
+    return render_template('auth/add_user.html', form=form)
+
+@app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_user(user_id):
+    """Admin form to edit existing users"""
+    user = User.query.get_or_404(user_id)
+    form = UserEditForm(original_user=user, obj=user)
+    form.role.data = user.role.value  # Set current role
+    
+    if form.validate_on_submit():
+        try:
+            # Prevent admin from deactivating themselves
+            if user.id == current_user.id and not form.is_active.data:
+                flash('You cannot deactivate your own account.', 'error')
+                return render_template('auth/edit_user.html', form=form, user=user)
+            
+            # Prevent removing admin role from last admin
+            if (user.is_admin and form.role.data != UserRole.ADMIN.value and 
+                User.query.filter_by(role=UserRole.ADMIN, is_active=True).count() <= 1):
+                flash('Cannot remove admin role - at least one active admin must exist.', 'error')
+                return render_template('auth/edit_user.html', form=form, user=user)
+            
+            # Update user
+            user.username = form.username.data
+            user.email = form.email.data
+            user.first_name = form.first_name.data
+            user.last_name = form.last_name.data
+            user.role = UserRole(form.role.data)
+            user.is_active = form.is_active.data
+            
+            db.session.commit()
+            
+            flash(f'User "{user.username}" updated successfully!', 'success')
+            return redirect(url_for('manage_users'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating user: {str(e)}', 'error')
+    
+    return render_template('auth/edit_user.html', form=form, user=user)
+
+@app.route('/admin/users/<int:user_id>/reset_password', methods=['GET', 'POST'])
+@admin_required
+def admin_reset_password(user_id):
+    """Admin form to reset user passwords"""
+    user = User.query.get_or_404(user_id)
+    form = AdminPasswordResetForm()
+    
+    if form.validate_on_submit():
+        try:
+            user.set_password(form.new_password.data)
+            db.session.commit()
+            
+            flash(f'Password reset successfully for user "{user.username}".', 'success')
+            return redirect(url_for('manage_users'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error resetting password: {str(e)}', 'error')
+    
+    return render_template('auth/reset_password.html', form=form, user=user)
+
+@app.route('/admin/users/<int:user_id>/toggle_status')
+@admin_required
+def toggle_user_status(user_id):
+    """Admin quick action to activate/deactivate users"""
+    user = User.query.get_or_404(user_id)
+    
+    # Prevent admin from deactivating themselves
+    if user.id == current_user.id:
+        flash('You cannot deactivate your own account.', 'error')
+        return redirect(url_for('manage_users'))
+    
+    try:
+        user.is_active = not user.is_active
+        action = "activated" if user.is_active else "deactivated"
+        
+        db.session.commit()
+        
+        flash(f'User "{user.username}" has been {action}.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating user status: {str(e)}', 'error')
+    
+    return redirect(url_for('manage_users'))
+
+# =============================================================================
+# PHASE 6A: ENHANCED STOCK TRANSACTION LOGGING WITH USER ATTRIBUTION
+# =============================================================================
+
+def log_stock_transaction_with_user(product, quantity_change, transaction_type, reason, user_notes=None):
+    """
+    Enhanced helper function to log stock transactions with user attribution
+    
+    This replaces your existing log_stock_transaction function
+    """
+    # Capture the before state
+    quantity_before = product.quantity
+    
+    # Apply the change
+    product.quantity += quantity_change
+    
+    # Capture the after state
+    quantity_after = product.quantity
+    
+    # Create the transaction record with user attribution
+    transaction = StockTransaction(
+        product_id=product.id,
+        transaction_type=transaction_type,
+        quantity_change=quantity_change,
+        quantity_before=quantity_before,
+        quantity_after=quantity_after,
+        reason=reason,
+        user_notes=user_notes,
+        performed_by_id=current_user.id if current_user.is_authenticated else None
+    )
+    
+    # Add transaction to database session
+    db.session.add(transaction)
+    
+    return transaction
+
+
 # Run the application
 if __name__ == '__main__':
     with app.app_context():
