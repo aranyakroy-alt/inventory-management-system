@@ -16,7 +16,12 @@ from auth_utils import (login_required_with_message, role_required, permission_r
                        self_or_admin_required, auth_template_context)
 from models import User, UserRole  # Add User, UserRole to your existing models import
 from werkzeug.security import generate_password_hash
-
+import logging
+import secrets
+from logging.handlers import RotatingFileHandler
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_wtf.csrf import CSRFProtect, validate_csrf, CSRFError
+from config import get_config
 
 
 def log_stock_transaction(product, quantity_change, transaction_type, reason, user_notes=None):
@@ -276,20 +281,111 @@ def generate_executive_recommendations(system_health, metrics):
     
     return recommendations
 
+# =============================================================================
+# RATE LIMITING IMPLEMENTATION
+# =============================================================================
 
-# Create Flask application
+# Simple in-memory rate limiting (use Redis in production)
+request_counts = {}
+RATE_LIMIT_PER_MINUTE = 60
+
+def rate_limit_check():
+    """Basic rate limiting implementation"""
+    if app.debug:
+        return True  # Skip rate limiting in development
+    
+    client_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    current_time = datetime.utcnow()
+    minute = current_time.replace(second=0, microsecond=0)
+    
+    key = f"{client_ip}:{minute}"
+    
+    if key not in request_counts:
+        request_counts[key] = 0
+    
+    request_counts[key] += 1
+    
+    # Clean old entries
+    cutoff_time = current_time - timedelta(minutes=2)
+    keys_to_remove = [k for k in request_counts.keys() 
+                     if datetime.fromisoformat(k.split(':')[1]) < cutoff_time]
+    for k in keys_to_remove:
+        del request_counts[k]
+    
+    return request_counts[key] <= RATE_LIMIT_PER_MINUTE
+
+def configure_logging(app):
+    """Configure application logging"""
+    if not app.debug and not app.testing:
+        # Create logs directory
+        if not os.path.exists('logs'):
+            os.mkdir('logs')
+        
+        # Configure file logging
+        file_handler = RotatingFileHandler(
+            'logs/inventory_system.log',
+            maxBytes=10240000,  # 10MB
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('Inventory Management System startup')
+
+def log_security_event(event_type, user_id=None, details=None):
+    """Log security-related events"""
+    log_entry = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'event_type': event_type,
+        'user_id': user_id,
+        'ip_address': request.environ.get('HTTP_X_REAL_IP', request.remote_addr),
+        'user_agent': request.headers.get('User-Agent', 'Unknown'),
+        'details': details
+    }
+    
+    app.logger.info(f"Security Event: {json.dumps(log_entry)}")
+
+def generate_secure_token():
+    """Generate a secure random token"""
+    return secrets.token_urlsafe(32)
+
+def validate_file_upload(file):
+    """Validate uploaded files"""
+    if not file or file.filename == '':
+        return False, "No file selected"
+    
+    # Check file extension
+    allowed_extensions = {'csv', 'xlsx', 'xls', 'pdf', 'png', 'jpg', 'jpeg'}
+    if '.' not in file.filename:
+        return False, "File must have an extension"
+    
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    if ext not in allowed_extensions:
+        return False, f"File type '.{ext}' not allowed"
+    
+    # Check file size (handled by MAX_CONTENT_LENGTH)
+    return True, "Valid file"
+
+# Enhanced Flask application with Phase 6B security
 app = Flask(__name__)
 
-# Configure database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key-here'  # Needed for flash messages
+# Load configuration from config.py
+config_class = get_config()
+app.config.from_object(config_class)
 
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS attacks
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)  # Session expires after 2 hours
+# Initialize CSRF Protection
+csrf = CSRFProtect(app)
 
+# Production middleware for reverse proxy (nginx, etc.)
+if not app.debug:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# Ensure upload directory exists
+os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
 
 # Flask-Login configuration
 login_manager = LoginManager()
@@ -300,6 +396,10 @@ login_manager.login_message_category = 'info'
 
 # Add authentication context to all templates
 app.context_processor(auth_template_context)
+
+# Initialize logging
+configure_logging(app)
+
 
 @app.before_request
 def session_security():
@@ -335,6 +435,75 @@ def after_request_security(response):
     
     return response
 
+@app.before_request
+def security_headers_and_checks():
+    """Comprehensive security checks before each request"""
+    # Make sessions permanent with timeout
+    session.permanent = True
+    
+    # Security checks for authenticated users
+    if current_user.is_authenticated:
+        # Check if user account is still active
+        if not current_user.is_active:
+            logout_user()
+            session.clear()
+            flash('Your account has been deactivated. Please contact an administrator.', 'error')
+            return redirect(url_for('login'))
+        
+        # Check for suspicious activity (optional)
+        if 'last_activity' in session:
+            last_activity = session['last_activity']
+            if (datetime.utcnow() - datetime.fromisoformat(last_activity)).seconds > 7200:  # 2 hours
+                logout_user()
+                session.clear()
+                flash('Session expired due to inactivity. Please log in again.', 'info')
+                return redirect(url_for('login'))
+        
+        # Update last activity
+        session['last_activity'] = datetime.utcnow().isoformat()
+    
+    # Prevent access to login page if already logged in
+    if request.endpoint == 'login' and current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
+    # Rate limiting check (basic implementation)
+    if not rate_limit_check():
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+
+@app.after_request
+def security_headers(response):
+    """Add comprehensive security headers to all responses"""
+    # Prevent caching of sensitive pages
+    if current_user.is_authenticated:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    
+    # Comprehensive security headers
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'  # Prevent clickjacking
+    response.headers['X-Content-Type-Options'] = 'nosniff'  # Prevent MIME sniffing
+    response.headers['X-XSS-Protection'] = '1; mode=block'  # XSS protection
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    # Content Security Policy (CSP) - adjust based on your needs
+    if not app.debug:
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "frame-ancestors 'self';"
+        )
+        response.headers['Content-Security-Policy'] = csp
+    
+    # HSTS (HTTP Strict Transport Security) - only in production with HTTPS
+    if not app.debug and request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    
+    return response
+
 # =============================================================================
 # FORCE LOGOUT UTILITY FUNCTION
 # =============================================================================
@@ -362,6 +531,28 @@ def load_user(user_id):
 
 # Initialize database with app
 db.init_app(app)
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Handle CSRF token errors"""
+    flash('Security token expired. Please try again.', 'error')
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """Handle 404 errors"""
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors"""
+    db.session.rollback()
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    """Handle 403 errors"""
+    return render_template('errors/403.html'), 403
 
 # Routes (URL endpoints)
 @app.route('/')
@@ -2785,14 +2976,16 @@ def analytics():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """User login page"""
-    # Redirect if already logged in
+    """Enhanced login with security logging and protection"""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     
     form = LoginForm()
     
     if form.validate_on_submit():
+        # Log login attempt
+        log_security_event('login_attempt', details={'username': form.username.data})
+        
         # Find user by username or email
         user = User.query.filter(
             (User.username == form.username.data) | 
@@ -2802,15 +2995,17 @@ def login():
         # Verify user exists, password is correct, and account is active
         if user and user.check_password(form.password.data):
             if not user.is_active:
+                log_security_event('login_failed', user.id, 'Account deactivated')
                 flash('Your account has been deactivated. Please contact an administrator.', 'error')
                 return render_template('auth/login.html', form=form)
             
-            # Log the user in
+            # Successful login
             login_user(user, remember=form.remember_me.data)
-            
-            # Update login statistics
             user.update_login_stats()
             db.session.commit()
+            
+            # Log successful login
+            log_security_event('login_success', user.id)
             
             # Redirect to intended page or dashboard
             next_page = request.args.get('next')
@@ -2820,6 +3015,12 @@ def login():
             flash(f'Welcome back, {user.first_name}! You have been logged in successfully.', 'success')
             return redirect(next_page)
         else:
+            # Log failed login
+            if user:
+                log_security_event('login_failed', user.id, 'Invalid password')
+            else:
+                log_security_event('login_failed', details={'username': form.username.data, 'reason': 'User not found'})
+            
             flash('Invalid username/email or password. Please try again.', 'error')
     
     return render_template('auth/login.html', form=form)

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Server Error{% endblock %}
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem; max-width: 600px; margin: 0 auto;">
+    <div style="font-size: 8rem; margin-bottom: 1rem;">⚠️</div>
+    <h1 style="font-size: 2.5rem; margin-bottom: 1rem; color: #e74c3c;">500 - Server Error</h1>
+    <p style="font-size: 1.2rem; color: #6c757d; margin-bottom: 2rem;">
+        Something went wrong on our end. We're working to fix it!
+    </p>
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">📊 Go to Dashboard</a>
+        <a href="javascript:location.reload()" class="btn btn-secondary">🔄 Refresh Page</a>
+    </div>
+</div>
+{% endblock %}
